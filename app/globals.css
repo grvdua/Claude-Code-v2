@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  height: 100%;
+  background-color: #f8fafc;
+  color: #0f172a;
+  -webkit-font-smoothing: antialiased;
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    'Helvetica Neue',
+    Arial,
+    sans-serif;
+}
+
+.card {
+  @apply rounded-xl bg-white shadow-sm ring-1 ring-slate-200;
+}
+
+.btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-offset-1 disabled:opacity-50 disabled:pointer-events-none;
+}
+
+.btn-primary {
+  @apply bg-brand-600 text-white hover:bg-brand-700 focus:ring-brand-500;
+}
+
+.btn-secondary {
+  @apply bg-slate-100 text-slate-800 hover:bg-slate-200 focus:ring-slate-400;
+}
+
+.btn-danger {
+  @apply bg-rose-600 text-white hover:bg-rose-700 focus:ring-rose-500;
+}
+
+.input,
+.select,
+.textarea {
+  @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500;
+}
+
+.label {
+  @apply mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500;
+}
+
+.table-th {
+  @apply px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500;
+}
+
+.table-td {
+  @apply px-3 py-2 text-sm text-slate-700;
+}
