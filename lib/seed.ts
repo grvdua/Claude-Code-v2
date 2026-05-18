@@ -186,6 +186,10 @@ export const seedExpenses: Expense[] = [
   },
 ];
 
+// Legacy seed entries — these have no `fileId` because they predate the
+// IndexedDB-backed upload flow. The vault still tracks them (with expiry
+// alerts etc.) but the "View"/"Download" actions are only available for
+// documents users upload through the new flow.
 export const seedDocuments: DocumentRecord[] = [
   {
     id: 'doc-1',
@@ -193,7 +197,6 @@ export const seedDocuments: DocumentRecord[] = [
     category: 'License',
     expiryDate: daysAhead(20),
     uploadedAt: daysAgo(300),
-    fileUrl: '#fssai-license.pdf',
   },
   {
     id: 'doc-2',
@@ -201,7 +204,6 @@ export const seedDocuments: DocumentRecord[] = [
     category: 'License',
     expiryDate: daysAhead(120),
     uploadedAt: daysAgo(200),
-    fileUrl: '#fire-noc.pdf',
   },
   {
     id: 'doc-3',
@@ -209,7 +211,6 @@ export const seedDocuments: DocumentRecord[] = [
     category: 'Agreement',
     expiryDate: daysAhead(400),
     uploadedAt: daysAgo(60),
-    fileUrl: '#rent-agreement.pdf',
   },
   {
     id: 'doc-4',
@@ -217,7 +218,6 @@ export const seedDocuments: DocumentRecord[] = [
     category: 'Invoice',
     expiryDate: daysAhead(700),
     uploadedAt: daysAgo(15),
-    fileUrl: '#sharma-invoice-aug.pdf',
   },
 ];
 

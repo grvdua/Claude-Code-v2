@@ -26,6 +26,7 @@ import {
   seedDocuments,
   seedStaff,
 } from './seed';
+import { deleteFile } from './fileStorage';
 
 export const PO_APPROVAL_THRESHOLD = 10000;
 
@@ -66,7 +67,10 @@ interface AppState {
 
   addExpense: (e: Omit<Expense, 'id' | 'date'>) => void;
 
-  addDocument: (d: Omit<DocumentRecord, 'id' | 'uploadedAt'>) => void;
+  addDocument: (d: Omit<DocumentRecord, 'id' | 'uploadedAt'>) => string;
+  deleteDocument: (id: string) => Promise<void>;
+  attachBillToExpense: (expenseId: string, documentId: string) => void;
+  attachInvoiceToPO: (poId: string, documentId: string) => void;
 
   toggleAttendance: (staffId: string, date: string) => void;
 }
@@ -203,12 +207,53 @@ export const useStore = create<AppState>()(
           ],
         })),
 
-      addDocument: (d) =>
+      addDocument: (d) => {
+        const newId = id('doc');
         set((s) => ({
           documents: [
-            { ...d, id: id('doc'), uploadedAt: new Date().toISOString() },
+            { ...d, id: newId, uploadedAt: new Date().toISOString() },
             ...s.documents,
           ],
+        }));
+        return newId;
+      },
+
+      deleteDocument: async (docId) => {
+        const target = useStore
+          .getState()
+          .documents.find((d) => d.id === docId);
+        set((s) => ({
+          documents: s.documents.filter((d) => d.id !== docId),
+          expenses: s.expenses.map((e) =>
+            e.billDocumentId === docId ? { ...e, billDocumentId: undefined } : e
+          ),
+          pos: s.pos.map((p) =>
+            p.invoiceDocumentId === docId
+              ? { ...p, invoiceDocumentId: undefined }
+              : p
+          ),
+        }));
+        if (target?.fileId) {
+          try {
+            await deleteFile(target.fileId);
+          } catch {
+            // swallow — UI will refresh and metadata is already gone
+          }
+        }
+      },
+
+      attachBillToExpense: (expenseId, documentId) =>
+        set((s) => ({
+          expenses: s.expenses.map((e) =>
+            e.id === expenseId ? { ...e, billDocumentId: documentId } : e
+          ),
+        })),
+
+      attachInvoiceToPO: (poId, documentId) =>
+        set((s) => ({
+          pos: s.pos.map((p) =>
+            p.id === poId ? { ...p, invoiceDocumentId: documentId } : p
+          ),
         })),
 
       toggleAttendance: (staffId, date) =>
@@ -228,7 +273,7 @@ export const useStore = create<AppState>()(
     }),
     {
       name: 'restaurant-os-store',
-      version: 1,
+      version: 2,
     }
   )
 );
@@ -263,7 +308,8 @@ export const formatDateTime = (iso: string) => {
   });
 };
 
-export const daysUntil = (iso: string) => {
+export const daysUntil = (iso: string | undefined) => {
+  if (!iso) return Number.POSITIVE_INFINITY;
   const ms = new Date(iso).getTime() - Date.now();
   return Math.ceil(ms / (1000 * 60 * 60 * 24));
 };

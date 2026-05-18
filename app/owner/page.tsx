@@ -234,7 +234,9 @@ export default function OwnerPage() {
                       <div className="text-xs text-slate-600">{d.category}</div>
                     </div>
                     <div className="text-right text-xs">
-                      <div className="font-medium">{formatDate(d.expiryDate)}</div>
+                      <div className="font-medium">
+                        {d.expiryDate ? formatDate(d.expiryDate) : '—'}
+                      </div>
                       <div className={expired ? 'text-rose-700' : 'text-amber-700'}>
                         {expired ? `Expired ${Math.abs(days)}d ago` : `In ${days}d`}
                       </div>

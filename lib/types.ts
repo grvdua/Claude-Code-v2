@@ -21,7 +21,13 @@ export type POStatus =
 
 export type Urgency = 'low' | 'medium' | 'high';
 
-export type DocumentCategory = 'License' | 'Agreement' | 'Invoice' | 'Salary Slip';
+export type DocumentCategory =
+  | 'License'
+  | 'Agreement'
+  | 'Invoice'
+  | 'Salary Slip'
+  | 'Bill'
+  | 'Other';
 
 export type JournalType = 'prep' | 'batch' | 'marination' | 'wastage';
 
@@ -85,6 +91,7 @@ export interface PurchaseOrder {
   approvedBy?: string;
   approvedAt?: string;
   grnLoggedAt?: string;
+  invoiceDocumentId?: string;
 }
 
 export interface JournalEntry {
@@ -105,15 +112,23 @@ export interface Expense {
   notes: string;
   date: string;
   loggedBy: string;
+  billDocumentId?: string;
 }
 
 export interface DocumentRecord {
   id: string;
   name: string;
   category: DocumentCategory;
-  expiryDate: string;
+  expiryDate?: string;
   uploadedAt: string;
-  fileUrl: string;
+  fileId?: string;
+  fileName?: string;
+  fileType?: string;
+  fileSize?: number;
+  notes?: string;
+  linkedTo?: { type: 'expense' | 'po' | 'grn' | 'staff'; id: string };
+  /** Legacy field for seed entries that have no IndexedDB-backed file. */
+  fileUrl?: string;
 }
 
 export interface StaffMember {

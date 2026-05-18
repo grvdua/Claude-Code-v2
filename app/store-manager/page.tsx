@@ -1,7 +1,16 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { Search, Send, FileCheck2, Warehouse, PackageCheck } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Search,
+  Send,
+  FileCheck2,
+  Warehouse,
+  PackageCheck,
+  Paperclip,
+  Loader2,
+  X,
+} from 'lucide-react';
 import { StatusBadge } from '@/components/StatusBadge';
 import {
   useStore,
@@ -11,6 +20,12 @@ import {
 } from '@/lib/store';
 import { useMounted } from '@/lib/useMounted';
 import type { MaterialRequest, Quote } from '@/lib/types';
+import {
+  saveFile,
+  getFileUrl,
+  formatFileSize,
+  MAX_FILE_SIZE_BYTES,
+} from '@/lib/fileStorage';
 
 const STORE = 'Store Manager';
 
@@ -21,14 +36,33 @@ export default function StoreManagerPage() {
   const vendors = useStore((s) => s.vendors);
   const quotes = useStore((s) => s.quotes);
   const pos = useStore((s) => s.pos);
+  const documents = useStore((s) => s.documents);
   const updateRequestStatus = useStore((s) => s.updateRequestStatus);
   const addQuote = useStore((s) => s.addQuote);
   const raisePO = useStore((s) => s.raisePO);
   const logGRN = useStore((s) => s.logGRN);
+  const addDocument = useStore((s) => s.addDocument);
+  const attachInvoiceToPO = useStore((s) => s.attachInvoiceToPO);
 
   const [inventoryFor, setInventoryFor] = useState<MaterialRequest | null>(null);
   const [rfqFor, setRfqFor] = useState<MaterialRequest | null>(null);
   const [rfqVendors, setRfqVendors] = useState<string[]>([]);
+
+  // GRN modal state
+  const [grnForPO, setGrnForPO] = useState<string | null>(null);
+  const [grnInvoice, setGrnInvoice] = useState<File | null>(null);
+  const [grnBusy, setGrnBusy] = useState(false);
+  const [grnError, setGrnError] = useState<string | null>(null);
+  const grnInputRef = useRef<HTMLInputElement>(null);
+
+  // Object URL cleanup
+  const objectUrlsRef = useRef<string[]>([]);
+  useEffect(() => {
+    return () => {
+      objectUrlsRef.current.forEach((u) => URL.revokeObjectURL(u));
+      objectUrlsRef.current = [];
+    };
+  }, []);
 
   if (!mounted) return null;
 
@@ -84,6 +118,60 @@ export default function StoreManagerPage() {
     () => requests.filter((r) => r.status === 'quotes-received'),
     [requests]
   );
+
+  const openGrn = (poId: string) => {
+    setGrnForPO(poId);
+    setGrnInvoice(null);
+    setGrnError(null);
+    if (grnInputRef.current) grnInputRef.current.value = '';
+  };
+
+  const submitGrn = async () => {
+    if (!grnForPO) return;
+    setGrnError(null);
+    if (grnInvoice && grnInvoice.size > MAX_FILE_SIZE_BYTES) {
+      setGrnError(
+        `Invoice is ${formatFileSize(grnInvoice.size)} — must be under 25 MB.`
+      );
+      return;
+    }
+    setGrnBusy(true);
+    try {
+      const poId = grnForPO;
+      if (grnInvoice) {
+        const fileId = await saveFile(grnInvoice);
+        const po = pos.find((p) => p.id === poId);
+        const vendorName =
+          vendors.find((v) => v.id === po?.vendorId)?.name ?? po?.vendorId ?? '';
+        const docId = addDocument({
+          name: `Invoice — ${poId}${vendorName ? ` — ${vendorName}` : ''}`,
+          category: 'Invoice',
+          fileId,
+          fileName: grnInvoice.name,
+          fileType: grnInvoice.type || 'application/octet-stream',
+          fileSize: grnInvoice.size,
+          linkedTo: { type: 'po', id: poId },
+        });
+        attachInvoiceToPO(poId, docId);
+      }
+      logGRN(poId);
+      setGrnForPO(null);
+      setGrnInvoice(null);
+    } catch (err) {
+      setGrnError(err instanceof Error ? err.message : 'Failed to log GRN.');
+    } finally {
+      setGrnBusy(false);
+    }
+  };
+
+  const viewDocument = async (documentId: string) => {
+    const doc = documents.find((d) => d.id === documentId);
+    if (!doc?.fileId) return;
+    const url = await getFileUrl(doc.fileId);
+    if (!url) return;
+    objectUrlsRef.current.push(url);
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
 
   return (
     <div className="space-y-6">
@@ -278,7 +366,21 @@ export default function StoreManagerPage() {
                 const v = vendors.find((vv) => vv.id === p.vendorId);
                 return (
                   <tr key={p.id}>
-                    <td className="table-td font-mono text-xs">{p.id}</td>
+                    <td className="table-td font-mono text-xs">
+                      <div className="flex items-center gap-2">
+                        <span>{p.id}</span>
+                        {p.invoiceDocumentId ? (
+                          <button
+                            type="button"
+                            onClick={() => viewDocument(p.invoiceDocumentId as string)}
+                            className="inline-flex items-center gap-1 text-brand-700 hover:underline"
+                            title="View attached invoice"
+                          >
+                            <Paperclip className="h-3.5 w-3.5" />
+                          </button>
+                        ) : null}
+                      </div>
+                    </td>
                     <td className="table-td">{v?.name ?? p.vendorId}</td>
                     <td className="table-td">
                       {p.items.map((it) => `${it.quantity} ${it.unit} ${it.itemName}`).join(', ')}
@@ -287,7 +389,7 @@ export default function StoreManagerPage() {
                     <td className="table-td"><StatusBadge status={p.status} /></td>
                     <td className="table-td text-right">
                       {p.status === 'approved' || p.status === 'ordered' ? (
-                        <button className="btn btn-primary text-xs" onClick={() => logGRN(p.id)}>
+                        <button className="btn btn-primary text-xs" onClick={() => openGrn(p.id)}>
                           <PackageCheck className="h-4 w-4" /> Log GRN
                         </button>
                       ) : (
@@ -301,6 +403,76 @@ export default function StoreManagerPage() {
           </table>
         </div>
       </section>
+
+      {grnForPO ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">Log GRN</h3>
+                <p className="text-xs text-slate-500">
+                  Confirm receipt for <span className="font-mono">{grnForPO}</span>.
+                  Attach the supplier invoice (optional).
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setGrnForPO(null)}
+                className="rounded p-1 text-slate-400 hover:bg-slate-100"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            {grnError ? (
+              <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-sm text-rose-700">
+                {grnError}
+              </div>
+            ) : null}
+            <div className="mt-3">
+              <label className="label">Attach invoice (optional)</label>
+              <input
+                ref={grnInputRef}
+                type="file"
+                accept="image/*,application/pdf"
+                onChange={(e) => setGrnInvoice(e.target.files?.[0] ?? null)}
+                className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-brand-700 hover:file:bg-brand-100"
+              />
+              {grnInvoice ? (
+                <div className="mt-1 text-xs text-slate-500">
+                  {grnInvoice.name} · {formatFileSize(grnInvoice.size)}
+                </div>
+              ) : null}
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setGrnForPO(null)}
+                disabled={grnBusy}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={submitGrn}
+                disabled={grnBusy}
+              >
+                {grnBusy ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" /> Logging...
+                  </>
+                ) : (
+                  <>
+                    <PackageCheck className="h-4 w-4" /> Confirm GRN
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
