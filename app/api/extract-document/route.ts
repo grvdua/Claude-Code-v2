@@ -255,6 +255,7 @@ export async function POST(req: Request) {
 
     return jsonOk(normalizeToolInput(toolUse.input));
   } catch (err) {
+    console.error('[extract-document] Claude API error:', err);
     const message =
       err instanceof Error ? err.message : 'AI extraction failed';
     return jsonFail(message);

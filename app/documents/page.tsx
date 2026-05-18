@@ -190,7 +190,7 @@ export default function DocumentsPage() {
       });
       const json = (await res.json()) as ExtractResponse;
       if (!json.ok) {
-        setAiNotice('AI extraction unavailable — please fill fields manually.');
+        setAiNotice(`AI extraction unavailable: ${json.error}`);
         return;
       }
       const d = json.data;
@@ -220,8 +220,9 @@ export default function DocumentsPage() {
           // Non-fatal — user can still save the document metadata.
         }
       }
-    } catch {
-      setAiNotice('AI extraction unavailable — please fill fields manually.');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'network error';
+      setAiNotice(`AI extraction unavailable: ${msg}`);
     } finally {
       setAnalyzing(false);
     }

@@ -402,17 +402,19 @@ function InvoiceUploadModal({
       const json = (await res.json()) as ExtractInvoiceResponse;
       if (!json.ok) {
         setLocalError(
-          'AI extraction failed — you can still enter the line items manually.'
+          `AI extraction failed: ${json.error}. You can still enter the line items manually.`
         );
-        // Provide a single blank line so the user can type immediately.
         setLines([{ name: '', quantity: '', unit: 'kg', unitPrice: '' }]);
         return;
       }
       setExtracted(json.data);
       setVendorName(json.data.vendorName);
       setLines(lineItemsFromExtracted(json.data.lineItems));
-    } catch {
-      setLocalError('AI extraction failed — you can still enter items manually.');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'network error';
+      setLocalError(
+        `AI extraction failed: ${msg}. You can still enter items manually.`
+      );
       setLines([{ name: '', quantity: '', unit: 'kg', unitPrice: '' }]);
     } finally {
       setAnalyzing(false);

@@ -320,6 +320,7 @@ export async function POST(req: Request) {
 
     return jsonOk(normalizeToolInput(toolUse.input));
   } catch (err) {
+    console.error('[extract-invoice] Claude API error:', err);
     const message =
       err instanceof Error ? err.message : 'AI invoice extraction failed';
     return jsonFail(message);
