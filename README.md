@@ -23,7 +23,17 @@ npm run typecheck    # tsc --noEmit
 
 ## Deploy
 
-Push to a GitHub repo, import into Vercel, accept defaults — the included `vercel.json` sets the framework to Next.js. No environment variables required.
+Push to a GitHub repo, import into Vercel, accept defaults — the included `vercel.json` sets the framework to Next.js. No environment variables required for the core app; set `ANTHROPIC_API_KEY` in Vercel project settings to enable AI document extraction (see below).
+
+## AI Document Extraction
+
+When a user uploads a document in the vault (PDF or image), the app can call Claude's vision API to pre-fill metadata fields — document name, type, license number, issuing authority, dates, registered entity — which the user can then review and edit before saving.
+
+- Uses Claude Sonnet 4.6 via the Anthropic API, with tool-based structured output for reliable JSON.
+- Set `ANTHROPIC_API_KEY` in your Vercel environment variables (or `.env.local` for local dev) to enable. See `.env.example`.
+- Without the key, uploads still work — the form just falls back to manual entry.
+- Files larger than 4 MB skip AI extraction (Vercel serverless body limit) but are still stored in IndexedDB; you fill the form by hand.
+- The full original file is always stored locally in IndexedDB regardless of whether extraction ran.
 
 ## Architecture
 

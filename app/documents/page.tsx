@@ -11,6 +11,7 @@ import {
   Trash2,
   Eye,
   Loader2,
+  Sparkles,
 } from 'lucide-react';
 import { useStore, formatDate, daysUntil } from '@/lib/store';
 import { useMounted } from '@/lib/useMounted';
@@ -35,11 +36,43 @@ const CATEGORIES: DocumentCategory[] = [
 
 const EXPIRY_REQUIRED: DocumentCategory[] = ['License', 'Agreement'];
 
+// Vercel serverless body limit is 4 MB — clamp AI extraction at the same value.
+// Larger files still get stored in IndexedDB; AI extraction is just skipped.
+const AI_EXTRACTION_MAX_BYTES = 4 * 1024 * 1024;
+
+const AI_SUPPORTED_TYPES = new Set<string>([
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+]);
+
+interface ExtractedDocumentData {
+  documentName: string;
+  documentType: string;
+  category: DocumentCategory;
+  licenseNumber: string;
+  issuingAuthority: string;
+  dateOfIssue: string;
+  dateOfExpiry: string;
+  registeredEntity: string;
+  notes: string;
+}
+
+type ExtractResponse =
+  | { ok: true; data: ExtractedDocumentData }
+  | { ok: false; error: string };
+
 function fileIconFor(type: string | undefined) {
   if (!type) return FileIcon;
   if (type.startsWith('image/')) return ImageIcon;
   if (type === 'application/pdf') return FileText;
   return FileIcon;
+}
+
+function isDocumentCategory(value: string): value is DocumentCategory {
+  return (CATEGORIES as string[]).includes(value);
 }
 
 export default function DocumentsPage() {
@@ -52,11 +85,23 @@ export default function DocumentsPage() {
   const canUpload =
     role === 'owner' || role === 'store-manager' || role === 'manager';
 
+  // Step A — file selection / AI extraction
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [aiNotice, setAiNotice] = useState<string | null>(null);
+  const [aiBadge, setAiBadge] = useState(false);
+
+  // Step B — form fields (editable)
   const [name, setName] = useState('');
   const [category, setCategory] = useState<DocumentCategory>('License');
+  const [documentType, setDocumentType] = useState('');
+  const [licenseNumber, setLicenseNumber] = useState('');
+  const [issuingAuthority, setIssuingAuthority] = useState('');
+  const [registeredEntity, setRegisteredEntity] = useState('');
+  const [dateOfIssue, setDateOfIssue] = useState('');
   const [expiry, setExpiry] = useState('');
   const [notes, setNotes] = useState('');
-  const [files, setFiles] = useState<File[]>([]);
+
   const [showForm, setShowForm] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -73,44 +118,99 @@ export default function DocumentsPage() {
     };
   }, []);
 
-  const pickFiles = (list: FileList | null) => {
-    if (!list) return;
-    const arr = Array.from(list);
-    const oversized = arr.find((f) => f.size > MAX_FILE_SIZE_BYTES);
-    if (oversized) {
+  const resetForm = () => {
+    setPendingFile(null);
+    setAnalyzing(false);
+    setAiNotice(null);
+    setAiBadge(false);
+    setName('');
+    setCategory('License');
+    setDocumentType('');
+    setLicenseNumber('');
+    setIssuingAuthority('');
+    setRegisteredEntity('');
+    setDateOfIssue('');
+    setExpiry('');
+    setNotes('');
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const runAiExtraction = async (file: File) => {
+    if (!AI_SUPPORTED_TYPES.has(file.type)) {
+      setAiNotice('AI extraction unavailable — please fill fields manually.');
+      return;
+    }
+    if (file.size > AI_EXTRACTION_MAX_BYTES) {
+      setAiNotice(
+        'File too large for AI extraction — please fill fields manually.'
+      );
+      return;
+    }
+    setAnalyzing(true);
+    setAiNotice(null);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch('/api/extract-document', {
+        method: 'POST',
+        body: fd,
+      });
+      const json = (await res.json()) as ExtractResponse;
+      if (!json.ok) {
+        setAiNotice('AI extraction unavailable — please fill fields manually.');
+        return;
+      }
+      const d = json.data;
+      if (d.documentName) setName(d.documentName);
+      if (d.category && isDocumentCategory(d.category)) setCategory(d.category);
+      if (d.documentType) setDocumentType(d.documentType);
+      if (d.licenseNumber) setLicenseNumber(d.licenseNumber);
+      if (d.issuingAuthority) setIssuingAuthority(d.issuingAuthority);
+      if (d.registeredEntity) setRegisteredEntity(d.registeredEntity);
+      if (d.dateOfIssue) setDateOfIssue(d.dateOfIssue);
+      if (d.dateOfExpiry) setExpiry(d.dateOfExpiry);
+      if (d.notes) setNotes(d.notes);
+      setAiBadge(true);
+    } catch {
+      setAiNotice('AI extraction unavailable — please fill fields manually.');
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const pickFile = (list: FileList | null) => {
+    if (!list || list.length === 0) return;
+    // One file at a time — keeps the AI extraction flow simple.
+    const f = list[0];
+    if (f.size > MAX_FILE_SIZE_BYTES) {
       setError(
-        `"${oversized.name}" is ${formatFileSize(oversized.size)} — files must be under 25 MB.`
+        `"${f.name}" is ${formatFileSize(f.size)} — files must be under 25 MB.`
       );
       return;
     }
     setError(null);
-    setFiles(arr);
-    // Default the document name to the first file's name (without extension) if blank
-    if (!name && arr[0]) {
-      const base = arr[0].name.replace(/\.[^.]+$/, '');
-      setName(base);
-    }
+    setSuccess(null);
+    // Sensible default in case AI yields nothing.
+    const base = f.name.replace(/\.[^.]+$/, '');
+    setName(base);
+    setPendingFile(f);
+    void runAiExtraction(f);
   };
 
   const onDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setDragOver(false);
-    pickFiles(e.dataTransfer.files);
-  };
-
-  const resetForm = () => {
-    setName('');
-    setExpiry('');
-    setNotes('');
-    setFiles([]);
-    setCategory('License');
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    pickFile(e.dataTransfer.files);
   };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSuccess(null);
+    if (!pendingFile) {
+      setError('Please select a file to upload.');
+      return;
+    }
     if (!name.trim()) {
       setError('Please enter a name for the document.');
       return;
@@ -119,35 +219,28 @@ export default function DocumentsPage() {
       setError(`Expiry date is required for category "${category}".`);
       return;
     }
-    if (files.length === 0) {
-      setError('Please select at least one file to upload.');
-      return;
-    }
     setUploading(true);
     try {
-      for (let i = 0; i < files.length; i++) {
-        const f = files[i];
-        const fileId = await saveFile(f);
-        const docName =
-          files.length === 1
-            ? name.trim()
-            : `${name.trim()} (${i + 1}/${files.length})`;
-        addDocument({
-          name: docName,
-          category,
-          expiryDate: expiry ? new Date(expiry).toISOString() : undefined,
-          fileId,
-          fileName: f.name,
-          fileType: f.type || 'application/octet-stream',
-          fileSize: f.size,
-          notes: notes.trim() || undefined,
-        });
-      }
-      setSuccess(
-        files.length === 1
-          ? 'Document uploaded successfully.'
-          : `${files.length} documents uploaded successfully.`
-      );
+      const fileId = await saveFile(pendingFile);
+      addDocument({
+        name: name.trim(),
+        category,
+        expiryDate: expiry ? new Date(expiry).toISOString() : undefined,
+        fileId,
+        fileName: pendingFile.name,
+        fileType: pendingFile.type || 'application/octet-stream',
+        fileSize: pendingFile.size,
+        notes: notes.trim() || undefined,
+        documentType: documentType.trim() || undefined,
+        licenseNumber: licenseNumber.trim() || undefined,
+        issuingAuthority: issuingAuthority.trim() || undefined,
+        registeredEntity: registeredEntity.trim() || undefined,
+        dateOfIssue: dateOfIssue
+          ? new Date(dateOfIssue).toISOString()
+          : undefined,
+        aiExtracted: aiBadge || undefined,
+      });
+      setSuccess('Document uploaded successfully.');
       resetForm();
       setShowForm(false);
     } catch (err) {
@@ -190,6 +283,8 @@ export default function DocumentsPage() {
 
   if (!mounted) return null;
 
+  const PendingIcon = fileIconFor(pendingFile?.type);
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
@@ -204,7 +299,11 @@ export default function DocumentsPage() {
           <button
             className="btn btn-primary"
             onClick={() => {
-              setShowForm((v) => !v);
+              setShowForm((v) => {
+                const next = !v;
+                if (!next) resetForm();
+                return next;
+              });
               setError(null);
               setSuccess(null);
             }}
@@ -228,57 +327,10 @@ export default function DocumentsPage() {
       {showForm && canUpload ? (
         <section className="card p-5">
           <h2 className="text-lg font-semibold text-slate-900">Upload document</h2>
-          <form onSubmit={submit} className="mt-3 grid gap-3 sm:grid-cols-2">
-            <div className="sm:col-span-2">
-              <label className="label">Name</label>
-              <input
-                className="input"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. GST Certificate"
-              />
-            </div>
-            <div>
-              <label className="label">Category</label>
-              <select
-                className="select"
-                value={category}
-                onChange={(e) => setCategory(e.target.value as DocumentCategory)}
-              >
-                {CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="label">
-                Expiry date{' '}
-                {EXPIRY_REQUIRED.includes(category) ? (
-                  <span className="text-rose-600">*</span>
-                ) : (
-                  <span className="text-slate-400">(optional)</span>
-                )}
-              </label>
-              <input
-                className="input"
-                type="date"
-                value={expiry}
-                onChange={(e) => setExpiry(e.target.value)}
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="label">Notes (optional)</label>
-              <input
-                className="input"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Anything worth remembering"
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="label">File(s)</label>
+
+          {/* Step A — file picker. Hidden once a file has been chosen. */}
+          {!pendingFile ? (
+            <div className="mt-3">
               <div
                 onDragOver={(e) => {
                   e.preventDefault();
@@ -288,7 +340,7 @@ export default function DocumentsPage() {
                 onDrop={onDrop}
                 onClick={() => fileInputRef.current?.click()}
                 className={clsx(
-                  'flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed p-6 text-center text-sm transition',
+                  'flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed p-8 text-center text-sm transition',
                   dragOver
                     ? 'border-brand-500 bg-brand-50 text-brand-700'
                     : 'border-slate-300 bg-slate-50 text-slate-600 hover:border-brand-400'
@@ -297,54 +349,186 @@ export default function DocumentsPage() {
                 <FilePlus className="h-6 w-6 text-slate-400" />
                 <div>
                   <span className="font-medium text-brand-700">Click to browse</span>{' '}
-                  or drag and drop files here
+                  or drag and drop a file here
                 </div>
                 <div className="text-xs text-slate-500">
-                  PDF or images, up to 25 MB each
+                  PDF or images, up to 25 MB. Files under 4 MB are auto-analyzed with AI.
                 </div>
                 <input
                   ref={fileInputRef}
                   type="file"
-                  multiple
                   accept="image/*,application/pdf"
                   className="hidden"
-                  onChange={(e) => pickFiles(e.target.files)}
+                  onChange={(e) => pickFile(e.target.files)}
                 />
               </div>
-              {files.length > 0 ? (
-                <ul className="mt-2 space-y-1 text-xs text-slate-600">
-                  {files.map((f, i) => (
-                    <li key={i} className="flex items-center justify-between rounded bg-slate-50 px-2 py-1">
-                      <span className="truncate">{f.name}</span>
-                      <span className="ml-2 text-slate-500">{formatFileSize(f.size)}</span>
-                    </li>
-                  ))}
-                </ul>
+            </div>
+          ) : (
+            <div className="mt-3 space-y-3">
+              {/* File preview */}
+              <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <PendingIcon className="h-5 w-5 text-slate-500 shrink-0" />
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium text-slate-800">
+                      {pendingFile.name}
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      {formatFileSize(pendingFile.size)} ·{' '}
+                      {pendingFile.type || 'unknown type'}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="text-xs font-medium text-slate-600 hover:text-rose-600"
+                  onClick={() => resetForm()}
+                  disabled={analyzing || uploading}
+                >
+                  Choose different file
+                </button>
+              </div>
+
+              {analyzing ? (
+                <div className="inline-flex items-center gap-2 rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700 ring-1 ring-brand-200">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Analyzing with AI...
+                </div>
+              ) : aiBadge ? (
+                <div className="inline-flex items-center gap-2 rounded-full bg-violet-50 px-3 py-1 text-xs font-medium text-violet-700 ring-1 ring-violet-200">
+                  <Sparkles className="h-3.5 w-3.5" /> AI-extracted — review and edit if needed
+                </div>
+              ) : aiNotice ? (
+                <div className="text-xs text-slate-500">{aiNotice}</div>
               ) : null}
+
+              <form onSubmit={submit} className="grid gap-3 sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                  <label className="label">Document name</label>
+                  <input
+                    className="input"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g. FSSAI License"
+                  />
+                </div>
+                <div>
+                  <label className="label">Category</label>
+                  <select
+                    className="select"
+                    value={category}
+                    onChange={(e) =>
+                      setCategory(e.target.value as DocumentCategory)
+                    }
+                  >
+                    {CATEGORIES.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Document type</label>
+                  <input
+                    className="input"
+                    value={documentType}
+                    onChange={(e) => setDocumentType(e.target.value)}
+                    placeholder="e.g. FSSAI License, Fire NOC"
+                  />
+                </div>
+                <div>
+                  <label className="label">License / document number</label>
+                  <input
+                    className="input"
+                    value={licenseNumber}
+                    onChange={(e) => setLicenseNumber(e.target.value)}
+                    placeholder="e.g. 10012345001234"
+                  />
+                </div>
+                <div>
+                  <label className="label">Issuing authority</label>
+                  <input
+                    className="input"
+                    value={issuingAuthority}
+                    onChange={(e) => setIssuingAuthority(e.target.value)}
+                    placeholder="e.g. FSSAI"
+                  />
+                </div>
+                <div>
+                  <label className="label">Registered entity</label>
+                  <input
+                    className="input"
+                    value={registeredEntity}
+                    onChange={(e) => setRegisteredEntity(e.target.value)}
+                    placeholder="Business or person the document is issued to"
+                  />
+                </div>
+                <div>
+                  <label className="label">
+                    Date of issue{' '}
+                    <span className="text-slate-400">(optional)</span>
+                  </label>
+                  <input
+                    className="input"
+                    type="date"
+                    value={dateOfIssue}
+                    onChange={(e) => setDateOfIssue(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="label">
+                    Date of expiry{' '}
+                    {EXPIRY_REQUIRED.includes(category) ? (
+                      <span className="text-rose-600">*</span>
+                    ) : (
+                      <span className="text-slate-400">(optional)</span>
+                    )}
+                  </label>
+                  <input
+                    className="input"
+                    type="date"
+                    value={expiry}
+                    onChange={(e) => setExpiry(e.target.value)}
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="label">Notes (optional)</label>
+                  <input
+                    className="input"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Anything worth remembering"
+                  />
+                </div>
+                <div className="sm:col-span-2 flex gap-2">
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={uploading || analyzing}
+                  >
+                    {uploading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" /> Saving...
+                      </>
+                    ) : (
+                      'Save'
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      resetForm();
+                      setShowForm(false);
+                    }}
+                    disabled={uploading}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
             </div>
-            <div className="sm:col-span-2 flex gap-2">
-              <button type="submit" className="btn btn-primary" disabled={uploading}>
-                {uploading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" /> Uploading...
-                  </>
-                ) : (
-                  'Save'
-                )}
-              </button>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => {
-                  resetForm();
-                  setShowForm(false);
-                }}
-                disabled={uploading}
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
+          )}
         </section>
       ) : null}
 
@@ -355,7 +539,8 @@ export default function DocumentsPage() {
               <tr className="border-b border-slate-200">
                 <th className="table-th">Name</th>
                 <th className="table-th">Category</th>
-                <th className="table-th">Size</th>
+                <th className="table-th">Issuer</th>
+                <th className="table-th">Issued</th>
                 <th className="table-th">Expiry</th>
                 <th className="table-th">Status</th>
                 <th className="table-th text-right">File</th>
@@ -376,17 +561,45 @@ export default function DocumentsPage() {
                     <td className="table-td">
                       <div className="flex items-center gap-2">
                         <Icon className="h-4 w-4 text-slate-400" />
-                        <div>
-                          <div className="font-medium">{d.name}</div>
+                        <div className="min-w-0">
+                          <div className="font-medium flex items-center gap-1">
+                            <span className="truncate">{d.name}</span>
+                            {d.aiExtracted ? (
+                              <Sparkles
+                                className="h-3 w-3 text-violet-500 shrink-0"
+                                aria-label="AI-extracted"
+                              />
+                            ) : null}
+                          </div>
+                          {d.documentType ? (
+                            <div className="text-xs text-slate-500">
+                              {d.documentType}
+                            </div>
+                          ) : null}
+                          {d.licenseNumber ? (
+                            <div className="text-xs text-slate-500">
+                              No. {d.licenseNumber}
+                            </div>
+                          ) : null}
                           {d.fileName ? (
-                            <div className="text-xs text-slate-500">{d.fileName}</div>
+                            <div className="text-xs text-slate-400">{d.fileName}</div>
                           ) : null}
                         </div>
                       </div>
                     </td>
                     <td className="table-td">{d.category}</td>
-                    <td className="table-td text-xs text-slate-500">
-                      {d.fileSize ? formatFileSize(d.fileSize) : '—'}
+                    <td className="table-td text-xs text-slate-600">
+                      {d.issuingAuthority ? (
+                        <div>{d.issuingAuthority}</div>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
+                      {d.registeredEntity ? (
+                        <div className="text-slate-400">to {d.registeredEntity}</div>
+                      ) : null}
+                    </td>
+                    <td className="table-td text-xs text-slate-600">
+                      {d.dateOfIssue ? formatDate(d.dateOfIssue) : '—'}
                     </td>
                     <td className="table-td">
                       {hasExpiry ? formatDate(d.expiryDate as string) : '—'}
@@ -448,7 +661,7 @@ export default function DocumentsPage() {
               })}
               {documents.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="table-td text-center text-sm text-slate-500">
+                  <td colSpan={7} className="table-td text-center text-sm text-slate-500">
                     No documents yet. Click "Upload document" to add one.
                   </td>
                 </tr>

@@ -129,6 +129,18 @@ export interface DocumentRecord {
   linkedTo?: { type: 'expense' | 'po' | 'grn' | 'staff'; id: string };
   /** Legacy field for seed entries that have no IndexedDB-backed file. */
   fileUrl?: string;
+  /** Specific document type — finer-grained than category (e.g. "FSSAI License", "Electricity Bill"). */
+  documentType?: string;
+  /** License/document/invoice number printed on the document. */
+  licenseNumber?: string;
+  /** Government body, regulator, company or person that issued the document. */
+  issuingAuthority?: string;
+  /** ISO date of issue/registration/grant. */
+  dateOfIssue?: string;
+  /** Name of the business or person the document is issued to. */
+  registeredEntity?: string;
+  /** True if any field was AI-populated during upload. */
+  aiExtracted?: boolean;
 }
 
 export interface StaffMember {
