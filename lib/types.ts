@@ -149,3 +149,88 @@ export interface StaffMember {
   role: string;
   attendance: Record<string, boolean>;
 }
+
+export type InvoiceType =
+  | 'raw-material'
+  | 'utility'
+  | 'rent'
+  | 'packaging'
+  | 'marketing'
+  | 'housekeeping'
+  | 'other';
+
+export interface InvoiceLineItem {
+  name: string;
+  quantity: number;
+  unit: string;
+  unitPrice: number;
+  totalPrice: number;
+}
+
+export interface ExtractedInvoiceData {
+  invoiceType: InvoiceType;
+  vendorName: string;
+  vendorGstin: string;
+  invoiceNumber: string;
+  invoiceDate: string;
+  totalAmount: number;
+  currency: string;
+  lineItems: InvoiceLineItem[];
+  notes: string;
+}
+
+export interface VendorLedgerEntry {
+  id: string;
+  vendorId: string;
+  vendorName: string;
+  invoiceNumber?: string;
+  invoiceDate: string;
+  itemName?: string;
+  quantity?: number;
+  unit?: string;
+  unitPrice?: number;
+  totalAmount: number;
+  invoiceType?: InvoiceType;
+  documentId?: string;
+  poId?: string;
+  recordedAt: string;
+  recordedBy: string;
+}
+
+export interface PriceHistoryEntry {
+  id: string;
+  itemId?: string;
+  itemName: string;
+  vendorId?: string;
+  vendorName?: string;
+  quantity: number;
+  unit: string;
+  unitPrice: number;
+  totalPrice: number;
+  date: string;
+  invoiceDocumentId?: string;
+}
+
+export interface ProcessInvoiceResult {
+  inventoryUpdates: string[];
+  ledgerId: string;
+  priceEntries: number;
+  matchedVendorId?: string;
+  createdVendor?: boolean;
+}
+
+export interface ProcessInvoiceOptions {
+  documentId?: string;
+  poId?: string;
+  recordedBy: string;
+  location?: Location;
+}
+
+export type VoiceFormType =
+  | 'expense'
+  | 'wastage'
+  | 'material-request'
+  | 'journal'
+  | 'inventory-adjust'
+  | 'attendance'
+  | 'document-meta';

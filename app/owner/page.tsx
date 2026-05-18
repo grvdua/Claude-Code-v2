@@ -10,6 +10,8 @@ import {
   ClipboardList,
   FileWarning,
   Activity,
+  TrendingUp,
+  Truck,
 } from 'lucide-react';
 import { KpiCard } from '@/components/KpiCard';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -33,6 +35,8 @@ export default function OwnerPage() {
   const journal = useStore((s) => s.journal);
   const documents = useStore((s) => s.documents);
   const vendors = useStore((s) => s.vendors);
+  const vendorLedger = useStore((s) => s.vendorLedger);
+  const priceHistory = useStore((s) => s.priceHistory);
   const approvePO = useStore((s) => s.approvePO);
   const rejectPO = useStore((s) => s.rejectPO);
 
@@ -60,6 +64,33 @@ export default function OwnerPage() {
     () => documents.filter((d) => daysUntil(d.expiryDate) <= 30),
     [documents]
   );
+
+  const thisMonthSpend = useMemo(() => {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+    return vendorLedger
+      .filter((e) => new Date(e.invoiceDate).getTime() >= start)
+      .reduce((s, e) => s + e.totalAmount, 0);
+  }, [vendorLedger]);
+
+  const priceAlerts = useMemo(() => {
+    const cutoff = Date.now() - 90 * 24 * 60 * 60 * 1000;
+    const byItem = new Map<string, number[]>();
+    for (const p of priceHistory) {
+      const name = p.itemName.toLowerCase();
+      if (!byItem.has(name)) byItem.set(name, []);
+      byItem.get(name)!.push(p.unitPrice);
+    }
+    let count = 0;
+    for (const p of priceHistory) {
+      if (new Date(p.date).getTime() < cutoff) continue;
+      const all = byItem.get(p.itemName.toLowerCase()) ?? [];
+      if (all.length < 2) continue;
+      const avg = all.reduce((s, n) => s + n, 0) / all.length;
+      if (avg > 0 && p.unitPrice > avg * 1.1) count += 1;
+    }
+    return count;
+  }, [priceHistory]);
 
   const recentActivity = useMemo(() => {
     const items: { id: string; when: string; text: string }[] = [];
@@ -94,7 +125,7 @@ export default function OwnerPage() {
         <p className="text-sm text-slate-600">Here’s the brief for today.</p>
       </header>
 
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <KpiCard
           label="Pending Approvals"
           value={pendingPOs.length}
@@ -121,6 +152,20 @@ export default function OwnerPage() {
           icon={Activity}
           tone="default"
           hint="Active requests"
+        />
+        <KpiCard
+          label="This month spend"
+          value={formatINR(thisMonthSpend)}
+          icon={Truck}
+          tone="default"
+          hint="Procurement to date"
+        />
+        <KpiCard
+          label="Price trend alerts"
+          value={priceAlerts}
+          icon={TrendingUp}
+          tone={priceAlerts ? 'warn' : 'success'}
+          hint="Items >10% above 3-mo avg"
         />
       </section>
 

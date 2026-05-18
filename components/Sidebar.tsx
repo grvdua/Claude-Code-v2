@@ -10,6 +10,7 @@ import {
   Receipt,
   FileText,
   Warehouse,
+  BarChart3,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useStore } from '@/lib/store';
@@ -23,6 +24,7 @@ const itemsByRole: Record<Role, NavItem[]> = {
     { href: '/owner', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/procurement', label: 'Procurement', icon: Truck },
     { href: '/inventory', label: 'Inventory', icon: Boxes },
+    { href: '/analytics', label: 'Analytics', icon: BarChart3 },
     { href: '/documents', label: 'Documents', icon: FileText },
   ],
   manager: [
@@ -38,6 +40,7 @@ const itemsByRole: Record<Role, NavItem[]> = {
     { href: '/store-manager', label: 'Store Dashboard', icon: Warehouse },
     { href: '/inventory', label: 'Inventory', icon: Boxes },
     { href: '/procurement', label: 'Procurement', icon: Truck },
+    { href: '/analytics', label: 'Analytics', icon: BarChart3 },
     { href: '/documents', label: 'Documents', icon: FileText },
   ],
 };

@@ -1,11 +1,35 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ChefHat, Trash2, PackagePlus, NotebookPen } from 'lucide-react';
 import { useStore, formatDateTime } from '@/lib/store';
 import { StatusBadge } from '@/components/StatusBadge';
 import { useMounted } from '@/lib/useMounted';
 import type { JournalType, Urgency } from '@/lib/types';
+import { VoiceInputButton } from '@/components/VoiceInputButton';
+import { VoiceFormDictation } from '@/components/VoiceFormDictation';
+
+interface ParsedJournal {
+  type?: JournalType;
+  description?: string;
+  itemName?: string;
+  quantity?: number;
+  notes?: string;
+}
+interface ParsedWastage {
+  itemName?: string;
+  quantity?: number;
+  unit?: string;
+  reason?: string;
+  notes?: string;
+}
+interface ParsedRequest {
+  itemName?: string;
+  quantity?: number;
+  unit?: string;
+  urgency?: Urgency;
+  notes?: string;
+}
 
 const CHEF = 'Chef Ramesh';
 
@@ -78,9 +102,15 @@ export default function ChefPage() {
     setRNotes('');
   };
 
-  if (!mounted) return null;
+  const myRequests = useMemo(
+    () =>
+      [...requests]
+        .filter((r) => r.raisedBy === CHEF)
+        .sort((a, b) => (a.raisedAt < b.raisedAt ? 1 : -1)),
+    [requests]
+  );
 
-  const myRequests = requests.filter((r) => r.raisedBy === CHEF);
+  if (!mounted) return null;
 
   return (
     <div className="space-y-6">
@@ -100,6 +130,16 @@ export default function ChefPage() {
             <NotebookPen className="h-4 w-4 text-brand-700" />
             <h2 className="text-lg font-semibold text-slate-900">Daily journal</h2>
           </div>
+          <VoiceFormDictation<ParsedJournal>
+            formType="journal"
+            onParsed={(d) => {
+              if (d.type && (['prep','batch','marination','wastage'] as const).includes(d.type as JournalType)) setType(d.type as JournalType);
+              if (d.description) setDescription(d.description);
+              if (d.itemName) setItemName(d.itemName);
+              if (d.quantity != null) setQuantity(String(d.quantity));
+            }}
+            className="mb-3"
+          />
           <form onSubmit={submitJournal} className="space-y-3">
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
@@ -116,12 +156,15 @@ export default function ChefPage() {
               </div>
               <div>
                 <label className="label">Item (optional)</label>
-                <input
-                  className="input"
-                  value={itemName}
-                  onChange={(e) => setItemName(e.target.value)}
-                  placeholder="e.g. Dal Makhani"
-                />
+                <div className="flex items-center gap-2">
+                  <input
+                    className="input"
+                    value={itemName}
+                    onChange={(e) => setItemName(e.target.value)}
+                    placeholder="e.g. Dal Makhani"
+                  />
+                  <VoiceInputButton onTranscript={(t) => setItemName(t)} mode="replace" />
+                </div>
               </div>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -143,13 +186,16 @@ export default function ChefPage() {
             </div>
             <div>
               <label className="label">Description</label>
-              <textarea
-                className="textarea"
-                rows={3}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="What was done?"
-              />
+              <div className="flex items-start gap-2">
+                <textarea
+                  className="textarea"
+                  rows={3}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="What was done?"
+                />
+                <VoiceInputButton onTranscript={(t) => setDescription(t)} mode="replace" />
+              </div>
             </div>
             <button type="submit" className="btn btn-primary">
               Log entry
@@ -162,11 +208,23 @@ export default function ChefPage() {
             <Trash2 className="h-4 w-4 text-rose-600" />
             <h2 className="text-lg font-semibold text-slate-900">Wastage log</h2>
           </div>
+          <VoiceFormDictation<ParsedWastage>
+            formType="wastage"
+            onParsed={(d) => {
+              if (d.itemName) setWItem(d.itemName);
+              if (d.quantity != null) setWQty(String(d.quantity));
+              if (d.reason) setWReason(d.reason);
+            }}
+            className="mb-3"
+          />
           <form onSubmit={submitWastage} className="space-y-3">
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <label className="label">Item</label>
-                <input className="input" value={wItem} onChange={(e) => setWItem(e.target.value)} placeholder="e.g. Tomatoes" />
+                <div className="flex items-center gap-2">
+                  <input className="input" value={wItem} onChange={(e) => setWItem(e.target.value)} placeholder="e.g. Tomatoes" />
+                  <VoiceInputButton onTranscript={(t) => setWItem(t)} mode="replace" />
+                </div>
               </div>
               <div>
                 <label className="label">Quantity</label>
@@ -182,13 +240,16 @@ export default function ChefPage() {
             </div>
             <div>
               <label className="label">Reason</label>
-              <textarea
-                className="textarea"
-                rows={2}
-                value={wReason}
-                onChange={(e) => setWReason(e.target.value)}
-                placeholder="e.g. Spoiled, dropped, over-cooked"
-              />
+              <div className="flex items-start gap-2">
+                <textarea
+                  className="textarea"
+                  rows={2}
+                  value={wReason}
+                  onChange={(e) => setWReason(e.target.value)}
+                  placeholder="e.g. Spoiled, dropped, over-cooked"
+                />
+                <VoiceInputButton onTranscript={(t) => setWReason(t)} mode="replace" />
+              </div>
             </div>
             <button type="submit" className="btn btn-danger">
               Record wastage
@@ -203,10 +264,24 @@ export default function ChefPage() {
           <h2 className="text-lg font-semibold text-slate-900">Raw material request</h2>
           <span className="text-xs text-slate-500">— goes to Store Manager</span>
         </div>
+        <VoiceFormDictation<ParsedRequest>
+          formType="material-request"
+          onParsed={(d) => {
+            if (d.itemName) setRItem(d.itemName);
+            if (d.quantity != null) setRQty(String(d.quantity));
+            if (d.unit) setRUnit(d.unit);
+            if (d.urgency && (['low','medium','high'] as const).includes(d.urgency)) setRUrgency(d.urgency);
+            if (d.notes) setRNotes(d.notes);
+          }}
+          className="mb-3"
+        />
         <form onSubmit={submitRequest} className="grid gap-3 sm:grid-cols-4">
           <div className="sm:col-span-2">
             <label className="label">Item</label>
-            <input className="input" value={rItem} onChange={(e) => setRItem(e.target.value)} placeholder="e.g. Paneer" />
+            <div className="flex items-center gap-2">
+              <input className="input" value={rItem} onChange={(e) => setRItem(e.target.value)} placeholder="e.g. Paneer" />
+              <VoiceInputButton onTranscript={(t) => setRItem(t)} mode="replace" />
+            </div>
           </div>
           <div>
             <label className="label">Quantity</label>
@@ -238,7 +313,10 @@ export default function ChefPage() {
           </div>
           <div className="sm:col-span-3">
             <label className="label">Notes</label>
-            <input className="input" value={rNotes} onChange={(e) => setRNotes(e.target.value)} placeholder="Why is this needed?" />
+            <div className="flex items-center gap-2">
+              <input className="input" value={rNotes} onChange={(e) => setRNotes(e.target.value)} placeholder="Why is this needed?" />
+              <VoiceInputButton onTranscript={(t) => setRNotes(t)} mode="replace" />
+            </div>
           </div>
           <div className="flex items-end sm:col-span-4">
             <button type="submit" className="btn btn-primary">Submit request</button>

@@ -18,6 +18,20 @@ import {
   formatFileSize,
   MAX_FILE_SIZE_BYTES,
 } from '@/lib/fileStorage';
+import { VoiceInputButton } from '@/components/VoiceInputButton';
+import { VoiceFormDictation } from '@/components/VoiceFormDictation';
+
+interface ParsedExpense {
+  category?: string;
+  amount?: number;
+  vendor?: string;
+  notes?: string;
+  date?: string;
+}
+interface ParsedAttendance {
+  staffName?: string;
+  present?: boolean;
+}
 
 const MANAGER = 'Restaurant Manager';
 
@@ -192,6 +206,16 @@ export default function ManagerPage() {
             {error}
           </div>
         ) : null}
+        <VoiceFormDictation<ParsedExpense>
+          formType="expense"
+          onParsed={(d) => {
+            if (d.category) setCategory(d.category);
+            if (d.amount != null) setAmount(String(d.amount));
+            if (d.vendor) setVendor(d.vendor);
+            if (d.notes) setNotes(d.notes);
+          }}
+          className="mt-3"
+        />
         <form onSubmit={submit} className="mt-3 grid gap-3 sm:grid-cols-4">
           <div>
             <label className="label">Category</label>
@@ -217,11 +241,17 @@ export default function ManagerPage() {
           </div>
           <div>
             <label className="label">Vendor</label>
-            <input className="input" value={vendor} onChange={(e) => setVendor(e.target.value)} />
+            <div className="flex items-center gap-2">
+              <input className="input" value={vendor} onChange={(e) => setVendor(e.target.value)} />
+              <VoiceInputButton onTranscript={(t) => setVendor(t)} mode="replace" />
+            </div>
           </div>
           <div>
             <label className="label">Notes</label>
-            <input className="input" value={notes} onChange={(e) => setNotes(e.target.value)} />
+            <div className="flex items-center gap-2">
+              <input className="input" value={notes} onChange={(e) => setNotes(e.target.value)} />
+              <VoiceInputButton onTranscript={(t) => setNotes(t)} mode="replace" />
+            </div>
           </div>
           <div className="sm:col-span-4">
             <label className="label">Attach bill (optional)</label>
@@ -306,6 +336,26 @@ export default function ManagerPage() {
 
         <section className="card p-5">
           <h2 className="text-lg font-semibold text-slate-900">Staff attendance — {formatDate(new Date().toISOString())}</h2>
+          <VoiceFormDictation<ParsedAttendance>
+            formType="attendance"
+            label='Dictate (e.g. "mark Rahul present")'
+            onParsed={(d) => {
+              if (!d.staffName) return;
+              const lower = d.staffName.toLowerCase();
+              const member = staff.find((m) =>
+                m.name.toLowerCase().includes(lower)
+              );
+              if (!member) {
+                setSlipError(`No staff matched "${d.staffName}"`);
+                return;
+              }
+              const current = !!member.attendance[today];
+              if (d.present === undefined || current !== d.present) {
+                toggleAttendance(member.id, today);
+              }
+            }}
+            className="mt-3"
+          />
           {slipError ? (
             <div className="mt-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-sm text-rose-700">
               {slipError}

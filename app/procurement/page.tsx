@@ -16,7 +16,9 @@ export default function ProcurementPage() {
   const vendors = useStore((s) => s.vendors);
 
   const merged = useMemo(() => {
-    return requests.map((r) => {
+    return [...requests]
+      .sort((a, b) => (a.raisedAt < b.raisedAt ? 1 : -1))
+      .map((r) => {
       const rQuotes = quotes.filter((q) => q.requestId === r.id);
       const rPOs = pos.filter((p) => p.requestId === r.id);
       const stage = (() => {

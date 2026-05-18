@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   FilePlus,
   FileText,
@@ -12,10 +12,15 @@ import {
   Eye,
   Loader2,
   Sparkles,
+  Receipt,
 } from 'lucide-react';
-import { useStore, formatDate, daysUntil } from '@/lib/store';
+import { useStore, formatDate, daysUntil, formatINR } from '@/lib/store';
 import { useMounted } from '@/lib/useMounted';
-import type { DocumentCategory, DocumentRecord } from '@/lib/types';
+import type {
+  DocumentCategory,
+  DocumentRecord,
+  ExtractedInvoiceData,
+} from '@/lib/types';
 import {
   saveFile,
   getFileUrl,
@@ -23,6 +28,7 @@ import {
   formatFileSize,
   MAX_FILE_SIZE_BYTES,
 } from '@/lib/fileStorage';
+import { VoiceInputButton } from '@/components/VoiceInputButton';
 import clsx from 'clsx';
 
 const CATEGORIES: DocumentCategory[] = [
@@ -64,6 +70,10 @@ type ExtractResponse =
   | { ok: true; data: ExtractedDocumentData }
   | { ok: false; error: string };
 
+type ExtractInvoiceResponse =
+  | { ok: true; data: ExtractedInvoiceData }
+  | { ok: false; error: string };
+
 function fileIconFor(type: string | undefined) {
   if (!type) return FileIcon;
   if (type.startsWith('image/')) return ImageIcon;
@@ -80,6 +90,7 @@ export default function DocumentsPage() {
   const documents = useStore((s) => s.documents);
   const addDocument = useStore((s) => s.addDocument);
   const deleteDocument = useStore((s) => s.deleteDocument);
+  const processInvoiceExtraction = useStore((s) => s.processInvoiceExtraction);
   const role = useStore((s) => s.role);
 
   const canUpload =
@@ -109,6 +120,18 @@ export default function DocumentsPage() {
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Invoice extraction state — only used when the category is Invoice.
+  const [pendingInvoice, setPendingInvoice] = useState<ExtractedInvoiceData | null>(
+    null
+  );
+  const [invoiceProcessing, setInvoiceProcessing] = useState(false);
+  const [lastSavedInvoiceDocId, setLastSavedInvoiceDocId] = useState<string | null>(
+    null
+  );
+
+  // Newest-first / month grouping toggle (default newest first).
+  const [sortDir, setSortDir] = useState<'newest' | 'oldest'>('newest');
+
   // Tracks object URLs we've handed out so we can revoke on unmount.
   const objectUrlsRef = useRef<string[]>([]);
   useEffect(() => {
@@ -132,6 +155,7 @@ export default function DocumentsPage() {
     setDateOfIssue('');
     setExpiry('');
     setNotes('');
+    setPendingInvoice(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -171,6 +195,22 @@ export default function DocumentsPage() {
       if (d.dateOfExpiry) setExpiry(d.dateOfExpiry);
       if (d.notes) setNotes(d.notes);
       setAiBadge(true);
+
+      // Cascade: if AI thinks this is an Invoice, extract line items too.
+      if (d.category === 'Invoice') {
+        try {
+          const fd2 = new FormData();
+          fd2.append('file', file);
+          const res2 = await fetch('/api/extract-invoice', {
+            method: 'POST',
+            body: fd2,
+          });
+          const inv = (await res2.json()) as ExtractInvoiceResponse;
+          if (inv.ok) setPendingInvoice(inv.data);
+        } catch {
+          // Non-fatal — user can still save the document metadata.
+        }
+      }
     } catch {
       setAiNotice('AI extraction unavailable — please fill fields manually.');
     } finally {
@@ -222,7 +262,7 @@ export default function DocumentsPage() {
     setUploading(true);
     try {
       const fileId = await saveFile(pendingFile);
-      addDocument({
+      const docId = addDocument({
         name: name.trim(),
         category,
         expiryDate: expiry ? new Date(expiry).toISOString() : undefined,
@@ -241,14 +281,54 @@ export default function DocumentsPage() {
         aiExtracted: aiBadge || undefined,
       });
       setSuccess('Document uploaded successfully.');
-      resetForm();
-      setShowForm(false);
+      // Remember docId in case the user later wants to apply invoice
+      // extraction — but we keep the panel visible until they decide.
+      if (pendingInvoice) {
+        setLastSavedInvoiceDocId(docId);
+      } else {
+        resetForm();
+        setShowForm(false);
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Upload failed.';
       setError(msg);
     } finally {
       setUploading(false);
     }
+  };
+
+  const applyInvoice = () => {
+    if (!pendingInvoice) return;
+    setInvoiceProcessing(true);
+    try {
+      const result = processInvoiceExtraction(pendingInvoice, {
+        documentId: lastSavedInvoiceDocId ?? undefined,
+        recordedBy: role ?? 'user',
+      });
+      const lines =
+        result.inventoryUpdates.length > 0
+          ? result.inventoryUpdates.join('; ')
+          : 'no inventory changes';
+      setSuccess(
+        `Applied invoice — ${lines}. Logged ${formatINR(
+          pendingInvoice.totalAmount
+        )} to ${pendingInvoice.vendorName || 'vendor'} ledger.`
+      );
+    } finally {
+      setInvoiceProcessing(false);
+      setPendingInvoice(null);
+      setLastSavedInvoiceDocId(null);
+      resetForm();
+      setShowForm(false);
+    }
+  };
+
+  const skipInvoice = () => {
+    setPendingInvoice(null);
+    setLastSavedInvoiceDocId(null);
+    setSuccess('Document saved — invoice not applied.');
+    resetForm();
+    setShowForm(false);
   };
 
   const handleView = async (doc: DocumentRecord) => {
@@ -280,6 +360,34 @@ export default function DocumentsPage() {
       setError(err instanceof Error ? err.message : 'Delete failed.');
     }
   };
+
+  // Group documents by month for sticky-header display.
+  const groupedDocs = useMemo(() => {
+    const sorted = [...documents].sort((a, b) => {
+      const ta = new Date(a.uploadedAt).getTime();
+      const tb = new Date(b.uploadedAt).getTime();
+      return sortDir === 'newest' ? tb - ta : ta - tb;
+    });
+    const map = new Map<string, DocumentRecord[]>();
+    const order: string[] = [];
+    for (const d of sorted) {
+      const dt = new Date(d.uploadedAt);
+      const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
+      if (!map.has(key)) {
+        map.set(key, []);
+        order.push(key);
+      }
+      map.get(key)!.push(d);
+    }
+    return order.map((key) => {
+      const [y, m] = key.split('-').map(Number);
+      const label = new Date(y, m - 1, 1).toLocaleDateString('en-IN', {
+        month: 'long',
+        year: 'numeric',
+      });
+      return { key, label, docs: map.get(key)! };
+    });
+  }, [documents, sortDir]);
 
   if (!mounted) return null;
 
@@ -401,15 +509,78 @@ export default function DocumentsPage() {
                 <div className="text-xs text-slate-500">{aiNotice}</div>
               ) : null}
 
+              {pendingInvoice ? (
+                <div className="rounded-lg border border-violet-200 bg-violet-50/60 p-3 text-sm">
+                  <div className="flex items-center gap-2 font-medium text-violet-900">
+                    <Receipt className="h-4 w-4" />
+                    AI detected a {pendingInvoice.invoiceType} invoice from{' '}
+                    {pendingInvoice.vendorName || 'unknown vendor'} ·{' '}
+                    {pendingInvoice.lineItems.length} line item
+                    {pendingInvoice.lineItems.length === 1 ? '' : 's'}
+                  </div>
+                  {pendingInvoice.lineItems.length > 0 ? (
+                    <ul className="mt-2 max-h-32 overflow-y-auto rounded bg-white p-2 text-xs ring-1 ring-violet-100">
+                      {pendingInvoice.lineItems.map((li, i) => (
+                        <li key={i} className="flex justify-between py-0.5">
+                          <span>
+                            {li.quantity} {li.unit} · {li.name}
+                          </span>
+                          <span className="tabular-nums text-slate-500">
+                            {formatINR(li.totalPrice)}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  <div className="mt-2 text-xs text-violet-700">
+                    Total: {formatINR(pendingInvoice.totalAmount)}
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={applyInvoice}
+                      disabled={invoiceProcessing || !lastSavedInvoiceDocId}
+                      className="btn btn-primary text-xs"
+                      title={
+                        lastSavedInvoiceDocId
+                          ? 'Apply to inventory + vendor ledger'
+                          : 'Save the document first, then apply'
+                      }
+                    >
+                      {invoiceProcessing ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Sparkles className="h-3.5 w-3.5" />
+                      )}
+                      Yes, apply
+                    </button>
+                    <button
+                      type="button"
+                      onClick={skipInvoice}
+                      disabled={invoiceProcessing}
+                      className="btn btn-secondary text-xs"
+                    >
+                      No, just save document
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
               <form onSubmit={submit} className="grid gap-3 sm:grid-cols-2">
                 <div className="sm:col-span-2">
                   <label className="label">Document name</label>
-                  <input
-                    className="input"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. FSSAI License"
-                  />
+                  <div className="flex items-center gap-2">
+                    <input
+                      className="input"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="e.g. FSSAI License"
+                    />
+                    <VoiceInputButton
+                      onTranscript={(t) => setName(t)}
+                      mode="replace"
+                    />
+                  </div>
                 </div>
                 <div>
                   <label className="label">Category</label>
@@ -493,12 +664,15 @@ export default function DocumentsPage() {
                 </div>
                 <div className="sm:col-span-2">
                   <label className="label">Notes (optional)</label>
-                  <input
-                    className="input"
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Anything worth remembering"
-                  />
+                  <div className="flex items-center gap-2">
+                    <input
+                      className="input"
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      placeholder="Anything worth remembering"
+                    />
+                    <VoiceInputButton onTranscript={(t) => setNotes(t)} />
+                  </div>
                 </div>
                 <div className="sm:col-span-2 flex gap-2">
                   <button
@@ -533,21 +707,46 @@ export default function DocumentsPage() {
       ) : null}
 
       <section className="card p-5">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-slate-200">
-                <th className="table-th">Name</th>
-                <th className="table-th">Category</th>
-                <th className="table-th">Issuer</th>
-                <th className="table-th">Issued</th>
-                <th className="table-th">Expiry</th>
-                <th className="table-th">Status</th>
-                <th className="table-th text-right">File</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {documents.map((d) => {
+        <div className="mb-3 flex items-center justify-between">
+          <div className="text-sm text-slate-500">
+            {documents.length} document{documents.length === 1 ? '' : 's'} ·
+            grouped by upload month
+          </div>
+          <button
+            type="button"
+            onClick={() =>
+              setSortDir((d) => (d === 'newest' ? 'oldest' : 'newest'))
+            }
+            className="text-xs font-medium text-brand-700 hover:underline"
+          >
+            Sort: {sortDir === 'newest' ? 'Newest first' : 'Oldest first'}
+          </button>
+        </div>
+        {groupedDocs.length === 0 ? (
+          <div className="rounded-lg bg-slate-50 p-4 text-center text-sm text-slate-500">
+            No documents yet. Click "Upload document" to add one.
+          </div>
+        ) : null}
+        {groupedDocs.map((group) => (
+          <div key={group.key} className="mb-4">
+            <h3 className="sticky top-16 z-10 -mx-5 mb-2 border-y border-slate-200 bg-slate-50/95 px-5 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-600 backdrop-blur">
+              {group.label}
+            </h3>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-slate-200">
+                    <th className="table-th">Name</th>
+                    <th className="table-th">Category</th>
+                    <th className="table-th">Issuer</th>
+                    <th className="table-th">Issued</th>
+                    <th className="table-th">Expiry</th>
+                    <th className="table-th">Status</th>
+                    <th className="table-th text-right">File</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {group.docs.map((d) => {
                 const days = daysUntil(d.expiryDate);
                 const hasExpiry = !!d.expiryDate;
                 const expired = hasExpiry && days < 0;
@@ -659,16 +858,11 @@ export default function DocumentsPage() {
                   </tr>
                 );
               })}
-              {documents.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="table-td text-center text-sm text-slate-500">
-                    No documents yet. Click "Upload document" to add one.
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ))}
       </section>
     </div>
   );

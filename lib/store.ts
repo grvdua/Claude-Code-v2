@@ -14,6 +14,12 @@ import type {
   DocumentRecord,
   StaffMember,
   RequestStatus,
+  VendorLedgerEntry,
+  PriceHistoryEntry,
+  ExtractedInvoiceData,
+  ProcessInvoiceOptions,
+  ProcessInvoiceResult,
+  Location,
 } from './types';
 import {
   seedInventory,
@@ -44,6 +50,8 @@ interface AppState {
   expenses: Expense[];
   documents: DocumentRecord[];
   staff: StaffMember[];
+  vendorLedger: VendorLedgerEntry[];
+  priceHistory: PriceHistoryEntry[];
 
   setRole: (r: Role | null) => void;
 
@@ -73,11 +81,20 @@ interface AppState {
   attachInvoiceToPO: (poId: string, documentId: string) => void;
 
   toggleAttendance: (staffId: string, date: string) => void;
+
+  addVendorLedgerEntry: (
+    entry: Omit<VendorLedgerEntry, 'id' | 'recordedAt'>
+  ) => string;
+  addPriceHistoryEntry: (entry: Omit<PriceHistoryEntry, 'id'>) => string;
+  processInvoiceExtraction: (
+    extracted: ExtractedInvoiceData,
+    opts: ProcessInvoiceOptions
+  ) => ProcessInvoiceResult;
 }
 
 export const useStore = create<AppState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       role: null,
       inventory: seedInventory,
       vendors: seedVendors,
@@ -88,6 +105,8 @@ export const useStore = create<AppState>()(
       expenses: seedExpenses,
       documents: seedDocuments,
       staff: seedStaff,
+      vendorLedger: [],
+      priceHistory: [],
 
       setRole: (role) => set({ role }),
 
@@ -270,10 +289,203 @@ export const useStore = create<AppState>()(
               : m
           ),
         })),
+
+      addVendorLedgerEntry: (entry) => {
+        const newId = id('vl');
+        set((s) => ({
+          vendorLedger: [
+            {
+              ...entry,
+              id: newId,
+              recordedAt: new Date().toISOString(),
+            },
+            ...s.vendorLedger,
+          ],
+        }));
+        return newId;
+      },
+
+      addPriceHistoryEntry: (entry) => {
+        const newId = id('ph');
+        set((s) => ({
+          priceHistory: [{ ...entry, id: newId }, ...s.priceHistory],
+        }));
+        return newId;
+      },
+
+      processInvoiceExtraction: (extracted, opts) => {
+        const state = get();
+        const recordedBy = opts.recordedBy;
+        const targetLocation: Location = opts.location ?? 'store-1';
+
+        // 1. Find or create vendor (case-insensitive match by name).
+        let createdVendor = false;
+        let matchedVendorId: string | undefined;
+        const vendorName = (extracted.vendorName || '').trim();
+        if (vendorName) {
+          const existing = state.vendors.find(
+            (v) => v.name.toLowerCase() === vendorName.toLowerCase()
+          );
+          if (existing) {
+            matchedVendorId = existing.id;
+          } else {
+            const newVendor: Vendor = {
+              id: id('v'),
+              name: vendorName,
+              category:
+                extracted.invoiceType === 'raw-material'
+                  ? 'Raw Material'
+                  : extracted.invoiceType,
+              contact: '',
+              rating: 0,
+            };
+            matchedVendorId = newVendor.id;
+            createdVendor = true;
+            set((s) => ({ vendors: [...s.vendors, newVendor] }));
+          }
+        }
+
+        // 2. Process line items: inventory + price history.
+        const inventoryUpdates: string[] = [];
+        let priceEntries = 0;
+        const invoiceIso = extracted.invoiceDate
+          ? new Date(extracted.invoiceDate).toISOString()
+          : new Date().toISOString();
+
+        const onlyRawMaterial = extracted.invoiceType === 'raw-material';
+
+        if (onlyRawMaterial) {
+          for (const li of extracted.lineItems) {
+            const liName = (li.name || '').trim();
+            if (!liName) continue;
+            const lower = liName.toLowerCase();
+            const currentInv = get().inventory;
+            // Try exact-case-insensitive first, then fuzzy contains.
+            let match = currentInv.find(
+              (i) => i.name.toLowerCase() === lower
+            );
+            if (!match) {
+              match = currentInv.find(
+                (i) =>
+                  i.name.toLowerCase().includes(lower) ||
+                  lower.includes(i.name.toLowerCase())
+              );
+            }
+            let itemId: string;
+            if (match) {
+              itemId = match.id;
+              set((s) => ({
+                inventory: s.inventory.map((it) =>
+                  it.id === match!.id
+                    ? {
+                        ...it,
+                        quantity: Math.max(0, it.quantity + (li.quantity || 0)),
+                      }
+                    : it
+                ),
+              }));
+              inventoryUpdates.push(
+                `+${li.quantity} ${li.unit || match.unit} ${match.name}`
+              );
+            } else {
+              // Create a new inventory item.
+              const newItem: InventoryItem = {
+                id: id('inv'),
+                name: liName,
+                category: 'Raw Material',
+                unit: li.unit || 'unit',
+                location: targetLocation,
+                quantity: li.quantity || 0,
+                reorderLevel: 0,
+              };
+              itemId = newItem.id;
+              set((s) => ({ inventory: [...s.inventory, newItem] }));
+              inventoryUpdates.push(
+                `new item ${li.quantity} ${li.unit || 'unit'} ${liName}`
+              );
+            }
+
+            // Price history
+            const phId = id('ph');
+            const phEntry: PriceHistoryEntry = {
+              id: phId,
+              itemId,
+              itemName: liName,
+              vendorId: matchedVendorId,
+              vendorName: vendorName || undefined,
+              quantity: li.quantity || 0,
+              unit: li.unit || '',
+              unitPrice: li.unitPrice || 0,
+              totalPrice:
+                li.totalPrice ?? (li.quantity || 0) * (li.unitPrice || 0),
+              date: invoiceIso,
+              invoiceDocumentId: opts.documentId,
+            };
+            set((s) => ({ priceHistory: [phEntry, ...s.priceHistory] }));
+            priceEntries += 1;
+          }
+        }
+
+        // 3. Vendor ledger entry summarising the invoice.
+        const ledgerId = id('vl');
+        const lineItemSummary =
+          extracted.lineItems.length === 1
+            ? extracted.lineItems[0].name
+            : extracted.lineItems.length > 1
+            ? `Multiple items (${extracted.lineItems.length})`
+            : undefined;
+
+        const ledgerEntry: VendorLedgerEntry = {
+          id: ledgerId,
+          vendorId: matchedVendorId ?? 'unknown',
+          vendorName: vendorName || 'Unknown vendor',
+          invoiceNumber: extracted.invoiceNumber || undefined,
+          invoiceDate: invoiceIso,
+          itemName: lineItemSummary,
+          quantity:
+            extracted.lineItems.length === 1
+              ? extracted.lineItems[0].quantity
+              : undefined,
+          unit:
+            extracted.lineItems.length === 1
+              ? extracted.lineItems[0].unit
+              : undefined,
+          unitPrice:
+            extracted.lineItems.length === 1
+              ? extracted.lineItems[0].unitPrice
+              : undefined,
+          totalAmount: extracted.totalAmount || 0,
+          invoiceType: extracted.invoiceType,
+          documentId: opts.documentId,
+          poId: opts.poId,
+          recordedAt: new Date().toISOString(),
+          recordedBy,
+        };
+        set((s) => ({ vendorLedger: [ledgerEntry, ...s.vendorLedger] }));
+
+        return {
+          inventoryUpdates,
+          ledgerId,
+          priceEntries,
+          matchedVendorId,
+          createdVendor,
+        };
+      },
     }),
     {
       name: 'restaurant-os-store',
-      version: 2,
+      version: 3,
+      migrate: (persisted, version) => {
+        const state =
+          persisted && typeof persisted === 'object'
+            ? (persisted as Record<string, unknown>)
+            : {};
+        if (version < 3) {
+          if (!Array.isArray(state.vendorLedger)) state.vendorLedger = [];
+          if (!Array.isArray(state.priceHistory)) state.priceHistory = [];
+        }
+        return state as unknown as AppState;
+      },
     }
   )
 );

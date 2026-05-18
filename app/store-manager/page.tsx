@@ -10,6 +10,8 @@ import {
   Paperclip,
   Loader2,
   X,
+  Sparkles,
+  Receipt,
 } from 'lucide-react';
 import { StatusBadge } from '@/components/StatusBadge';
 import {
@@ -19,13 +21,21 @@ import {
   formatDateTime,
 } from '@/lib/store';
 import { useMounted } from '@/lib/useMounted';
-import type { MaterialRequest, Quote } from '@/lib/types';
+import type {
+  ExtractedInvoiceData,
+  MaterialRequest,
+  Quote,
+} from '@/lib/types';
 import {
   saveFile,
   getFileUrl,
   formatFileSize,
   MAX_FILE_SIZE_BYTES,
 } from '@/lib/fileStorage';
+
+type ExtractInvoiceResponse =
+  | { ok: true; data: ExtractedInvoiceData }
+  | { ok: false; error: string };
 
 const STORE = 'Store Manager';
 
@@ -43,6 +53,7 @@ export default function StoreManagerPage() {
   const logGRN = useStore((s) => s.logGRN);
   const addDocument = useStore((s) => s.addDocument);
   const attachInvoiceToPO = useStore((s) => s.attachInvoiceToPO);
+  const processInvoiceExtraction = useStore((s) => s.processInvoiceExtraction);
 
   const [inventoryFor, setInventoryFor] = useState<MaterialRequest | null>(null);
   const [rfqFor, setRfqFor] = useState<MaterialRequest | null>(null);
@@ -53,6 +64,11 @@ export default function StoreManagerPage() {
   const [grnInvoice, setGrnInvoice] = useState<File | null>(null);
   const [grnBusy, setGrnBusy] = useState(false);
   const [grnError, setGrnError] = useState<string | null>(null);
+  const [grnExtracting, setGrnExtracting] = useState(false);
+  const [grnExtracted, setGrnExtracted] = useState<ExtractedInvoiceData | null>(
+    null
+  );
+  const [grnApplyInventory, setGrnApplyInventory] = useState(true);
   const grnInputRef = useRef<HTMLInputElement>(null);
 
   // Object URL cleanup
@@ -123,7 +139,34 @@ export default function StoreManagerPage() {
     setGrnForPO(poId);
     setGrnInvoice(null);
     setGrnError(null);
+    setGrnExtracted(null);
+    setGrnApplyInventory(true);
     if (grnInputRef.current) grnInputRef.current.value = '';
+  };
+
+  const handleGrnInvoicePick = async (file: File | null) => {
+    setGrnInvoice(file);
+    setGrnExtracted(null);
+    if (!file) return;
+    if (file.size > 4 * 1024 * 1024) {
+      // Too big for AI; user can still attach without extraction.
+      return;
+    }
+    setGrnExtracting(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch('/api/extract-invoice', {
+        method: 'POST',
+        body: fd,
+      });
+      const json = (await res.json()) as ExtractInvoiceResponse;
+      if (json.ok) setGrnExtracted(json.data);
+    } catch {
+      // non-fatal
+    } finally {
+      setGrnExtracting(false);
+    }
   };
 
   const submitGrn = async () => {
@@ -138,12 +181,13 @@ export default function StoreManagerPage() {
     setGrnBusy(true);
     try {
       const poId = grnForPO;
+      let docId: string | undefined;
       if (grnInvoice) {
         const fileId = await saveFile(grnInvoice);
         const po = pos.find((p) => p.id === poId);
         const vendorName =
           vendors.find((v) => v.id === po?.vendorId)?.name ?? po?.vendorId ?? '';
-        const docId = addDocument({
+        docId = addDocument({
           name: `Invoice — ${poId}${vendorName ? ` — ${vendorName}` : ''}`,
           category: 'Invoice',
           fileId,
@@ -154,9 +198,17 @@ export default function StoreManagerPage() {
         });
         attachInvoiceToPO(poId, docId);
       }
+      if (grnExtracted && grnApplyInventory) {
+        processInvoiceExtraction(grnExtracted, {
+          documentId: docId,
+          poId,
+          recordedBy: STORE,
+        });
+      }
       logGRN(poId);
       setGrnForPO(null);
       setGrnInvoice(null);
+      setGrnExtracted(null);
     } catch (err) {
       setGrnError(err instanceof Error ? err.message : 'Failed to log GRN.');
     } finally {
@@ -362,7 +414,9 @@ export default function StoreManagerPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {pos.map((p) => {
+              {[...pos]
+                .sort((a, b) => (a.raisedAt < b.raisedAt ? 1 : -1))
+                .map((p) => {
                 const v = vendors.find((vv) => vv.id === p.vendorId);
                 return (
                   <tr key={p.id}>
@@ -435,12 +489,42 @@ export default function StoreManagerPage() {
                 ref={grnInputRef}
                 type="file"
                 accept="image/*,application/pdf"
-                onChange={(e) => setGrnInvoice(e.target.files?.[0] ?? null)}
+                onChange={(e) =>
+                  handleGrnInvoicePick(e.target.files?.[0] ?? null)
+                }
                 className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-brand-700 hover:file:bg-brand-100"
               />
               {grnInvoice ? (
                 <div className="mt-1 text-xs text-slate-500">
                   {grnInvoice.name} · {formatFileSize(grnInvoice.size)}
+                </div>
+              ) : null}
+              {grnExtracting ? (
+                <div className="mt-2 inline-flex items-center gap-1.5 text-xs text-brand-700">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Extracting line items...
+                </div>
+              ) : null}
+              {grnExtracted ? (
+                <div className="mt-2 rounded-lg border border-violet-200 bg-violet-50/60 p-2 text-xs">
+                  <div className="flex items-center gap-1 font-medium text-violet-900">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    {grnExtracted.invoiceType} invoice from{' '}
+                    {grnExtracted.vendorName || '—'} ·{' '}
+                    {grnExtracted.lineItems.length} item
+                    {grnExtracted.lineItems.length === 1 ? '' : 's'}
+                  </div>
+                  {grnForPO ? <GrnComparison
+                    poId={grnForPO}
+                    extracted={grnExtracted}
+                  /> : null}
+                  <label className="mt-2 inline-flex items-center gap-1.5 text-xs">
+                    <input
+                      type="checkbox"
+                      checked={grnApplyInventory}
+                      onChange={(e) => setGrnApplyInventory(e.target.checked)}
+                    />
+                    Apply to inventory + vendor ledger
+                  </label>
                 </div>
               ) : null}
             </div>
@@ -473,6 +557,100 @@ export default function StoreManagerPage() {
           </div>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function GrnComparison({
+  poId,
+  extracted,
+}: {
+  poId: string;
+  extracted: ExtractedInvoiceData;
+}) {
+  const pos = useStore((s) => s.pos);
+  const po = pos.find((p) => p.id === poId);
+  if (!po || extracted.lineItems.length === 0) return null;
+
+  // Build a comparison: PO expected vs invoice extracted (matched by name).
+  const rows = po.items.map((it) => {
+    const match = extracted.lineItems.find(
+      (li) =>
+        li.name.toLowerCase() === it.itemName.toLowerCase() ||
+        li.name.toLowerCase().includes(it.itemName.toLowerCase()) ||
+        it.itemName.toLowerCase().includes(li.name.toLowerCase())
+    );
+    return {
+      name: it.itemName,
+      expectedQty: it.quantity,
+      actualQty: match?.quantity ?? 0,
+      unit: it.unit,
+    };
+  });
+  // Extra invoice items not on the PO
+  const extras = extracted.lineItems.filter(
+    (li) =>
+      !po.items.some(
+        (it) =>
+          it.itemName.toLowerCase() === li.name.toLowerCase() ||
+          it.itemName.toLowerCase().includes(li.name.toLowerCase()) ||
+          li.name.toLowerCase().includes(it.itemName.toLowerCase())
+      )
+  );
+
+  return (
+    <div className="mt-2 rounded bg-white p-2 ring-1 ring-violet-100">
+      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-violet-700">
+        PO vs invoice
+      </div>
+      <table className="w-full text-[11px]">
+        <thead>
+          <tr className="text-slate-500">
+            <th className="py-0.5 text-left">Item</th>
+            <th className="py-0.5 text-right">Expected</th>
+            <th className="py-0.5 text-right">Invoice</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => {
+            const diff = r.actualQty - r.expectedQty;
+            return (
+              <tr key={i}>
+                <td className="py-0.5">{r.name}</td>
+                <td className="py-0.5 text-right tabular-nums">
+                  {r.expectedQty} {r.unit}
+                </td>
+                <td
+                  className={
+                    'py-0.5 text-right tabular-nums ' +
+                    (diff === 0
+                      ? 'text-emerald-700'
+                      : diff > 0
+                      ? 'text-amber-700'
+                      : 'text-rose-700')
+                  }
+                >
+                  {r.actualQty} {r.unit}
+                </td>
+              </tr>
+            );
+          })}
+          {extras.map((li, i) => (
+            <tr key={`x-${i}`} className="text-slate-600">
+              <td className="py-0.5">
+                <span className="inline-flex items-center gap-1">
+                  <Receipt className="h-3 w-3 text-violet-500" />
+                  {li.name}
+                </span>
+              </td>
+              <td className="py-0.5 text-right tabular-nums">—</td>
+              <td className="py-0.5 text-right tabular-nums">
+                {li.quantity} {li.unit}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
