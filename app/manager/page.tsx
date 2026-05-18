@@ -361,6 +361,11 @@ export default function ManagerPage() {
               {slipError}
             </div>
           ) : null}
+          {staff.length === 0 ? (
+            <div className="mt-3 rounded-lg bg-slate-50 p-4 text-sm text-slate-500">
+              No staff added yet. Staff records appear here once added to your roster.
+            </div>
+          ) : null}
           <ul className="mt-3 divide-y divide-slate-100">
             {staff.map((s) => {
               const present = !!s.attendance[today];

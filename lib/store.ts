@@ -474,15 +474,26 @@ export const useStore = create<AppState>()(
     }),
     {
       name: 'restaurant-os-store',
-      version: 3,
+      version: 4,
       migrate: (persisted, version) => {
         const state =
           persisted && typeof persisted === 'object'
             ? (persisted as Record<string, unknown>)
             : {};
-        if (version < 3) {
-          if (!Array.isArray(state.vendorLedger)) state.vendorLedger = [];
-          if (!Array.isArray(state.priceHistory)) state.priceHistory = [];
+        // v4: clear all demo/seed collections so existing users get a
+        // fresh empty workspace. Role is preserved.
+        if (version < 4) {
+          state.inventory = [];
+          state.vendors = [];
+          state.requests = [];
+          state.quotes = [];
+          state.pos = [];
+          state.journal = [];
+          state.expenses = [];
+          state.documents = [];
+          state.staff = [];
+          state.vendorLedger = [];
+          state.priceHistory = [];
         }
         return state as unknown as AppState;
       },

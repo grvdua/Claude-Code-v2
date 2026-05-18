@@ -62,7 +62,7 @@ export default function HomePage() {
     <div className="space-y-8">
       <section className="text-center">
         <div className="inline-flex items-center gap-2 rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700 ring-1 ring-brand-200">
-          MVP demo — runs entirely in your browser
+          Runs entirely in your browser — your data stays on this device
         </div>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
           Run your restaurant from anywhere.

@@ -132,6 +132,15 @@ export default function DocumentsPage() {
   // Newest-first / month grouping toggle (default newest first).
   const [sortDir, setSortDir] = useState<'newest' | 'oldest'>('newest');
 
+  // Top-level tab filter. 'All' shows everything; the rest filter by category.
+  type TabKey = 'All' | DocumentCategory;
+  const [tab, setTab] = useState<TabKey>('All');
+
+  // For the Licenses tab — sort by expiry urgency (soonest first) or upload.
+  const [licenseSort, setLicenseSort] = useState<'expiry' | 'uploaded'>(
+    'expiry'
+  );
+
   // Tracks object URLs we've handed out so we can revoke on unmount.
   const objectUrlsRef = useRef<string[]>([]);
   useEffect(() => {
@@ -361,33 +370,99 @@ export default function DocumentsPage() {
     }
   };
 
-  // Group documents by month for sticky-header display.
-  const groupedDocs = useMemo(() => {
-    const sorted = [...documents].sort((a, b) => {
-      const ta = new Date(a.uploadedAt).getTime();
-      const tb = new Date(b.uploadedAt).getTime();
-      return sortDir === 'newest' ? tb - ta : ta - tb;
-    });
-    const map = new Map<string, DocumentRecord[]>();
-    const order: string[] = [];
-    for (const d of sorted) {
-      const dt = new Date(d.uploadedAt);
-      const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
-      if (!map.has(key)) {
-        map.set(key, []);
-        order.push(key);
-      }
-      map.get(key)!.push(d);
+  // Documents filtered by the current tab.
+  const tabbedDocs = useMemo(() => {
+    if (tab === 'All') return documents;
+    return documents.filter((d) => d.category === tab);
+  }, [documents, tab]);
+
+  // Counts per tab — used for header badges.
+  const tabCounts = useMemo(() => {
+    const counts: Record<TabKey, number> = {
+      All: documents.length,
+      License: 0,
+      Agreement: 0,
+      Invoice: 0,
+      Bill: 0,
+      'Salary Slip': 0,
+      Other: 0,
+    };
+    for (const d of documents) {
+      counts[d.category] = (counts[d.category] ?? 0) + 1;
     }
-    return order.map((key) => {
-      const [y, m] = key.split('-').map(Number);
-      const label = new Date(y, m - 1, 1).toLocaleDateString('en-IN', {
-        month: 'long',
-        year: 'numeric',
+    return counts;
+  }, [documents]);
+
+  // For Invoices tab: group by month (newest first). For Licenses tab: sort
+  // by expiry urgency (soonest first) or upload date. All other tabs: flat
+  // list sorted by uploadedAt.
+  const groupedDocs = useMemo(() => {
+    if (tab === 'Invoice') {
+      // Month grouping, newest month first.
+      const sorted = [...tabbedDocs].sort((a, b) => {
+        const ta = new Date(a.uploadedAt).getTime();
+        const tb = new Date(b.uploadedAt).getTime();
+        return sortDir === 'newest' ? tb - ta : ta - tb;
       });
-      return { key, label, docs: map.get(key)! };
-    });
-  }, [documents, sortDir]);
+      const map = new Map<string, DocumentRecord[]>();
+      const order: string[] = [];
+      for (const d of sorted) {
+        const dt = new Date(d.uploadedAt);
+        const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
+        if (!map.has(key)) {
+          map.set(key, []);
+          order.push(key);
+        }
+        map.get(key)!.push(d);
+      }
+      return order.map((key) => {
+        const [y, m] = key.split('-').map(Number);
+        const label = new Date(y, m - 1, 1).toLocaleDateString('en-IN', {
+          month: 'long',
+          year: 'numeric',
+        });
+        return { key, label, docs: map.get(key)! };
+      });
+    }
+
+    // Non-invoice tabs: single flat group, no sticky header.
+    let sorted: DocumentRecord[];
+    if (tab === 'License' && licenseSort === 'expiry') {
+      sorted = [...tabbedDocs].sort((a, b) => {
+        // Items without an expiry sink to the bottom.
+        const ea = a.expiryDate ? new Date(a.expiryDate).getTime() : Infinity;
+        const eb = b.expiryDate ? new Date(b.expiryDate).getTime() : Infinity;
+        return ea - eb;
+      });
+    } else {
+      sorted = [...tabbedDocs].sort((a, b) => {
+        const ta = new Date(a.uploadedAt).getTime();
+        const tb = new Date(b.uploadedAt).getTime();
+        return sortDir === 'newest' ? tb - ta : ta - tb;
+      });
+    }
+    return [{ key: 'all', label: '', docs: sorted }];
+  }, [tabbedDocs, tab, sortDir, licenseSort]);
+
+  const TABS: TabKey[] = [
+    'All',
+    'License',
+    'Agreement',
+    'Invoice',
+    'Bill',
+    'Salary Slip',
+    'Other',
+  ];
+
+  const tabLabel = (k: TabKey): string => {
+    if (k === 'All') return 'All';
+    if (k === 'License') return 'Licenses';
+    if (k === 'Agreement') return 'Agreements';
+    if (k === 'Invoice') return 'Invoices';
+    if (k === 'Bill') return 'Bills';
+    if (k === 'Salary Slip') return 'Salary Slips';
+    return 'Other';
+  };
 
   if (!mounted) return null;
 
@@ -707,31 +782,88 @@ export default function DocumentsPage() {
       ) : null}
 
       <section className="card p-5">
-        <div className="mb-3 flex items-center justify-between">
-          <div className="text-sm text-slate-500">
-            {documents.length} document{documents.length === 1 ? '' : 's'} ·
-            grouped by upload month
+        {/* Top-level category tabs */}
+        <div className="mb-4 -mx-5 overflow-x-auto border-b border-slate-200 px-5">
+          <div className="flex gap-1">
+            {TABS.map((k) => {
+              const active = tab === k;
+              const count = tabCounts[k];
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => setTab(k)}
+                  className={clsx(
+                    '-mb-px whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition',
+                    active
+                      ? 'border-brand-600 text-brand-700'
+                      : 'border-transparent text-slate-500 hover:text-slate-700'
+                  )}
+                >
+                  {tabLabel(k)}{' '}
+                  <span
+                    className={clsx(
+                      'ml-1 rounded-full px-1.5 py-0.5 text-xs',
+                      active
+                        ? 'bg-brand-100 text-brand-700'
+                        : 'bg-slate-100 text-slate-500'
+                    )}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
           </div>
-          <button
-            type="button"
-            onClick={() =>
-              setSortDir((d) => (d === 'newest' ? 'oldest' : 'newest'))
-            }
-            className="text-xs font-medium text-brand-700 hover:underline"
-          >
-            Sort: {sortDir === 'newest' ? 'Newest first' : 'Oldest first'}
-          </button>
         </div>
-        {groupedDocs.length === 0 ? (
+
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="text-sm text-slate-500">
+            {tabbedDocs.length} {tabLabel(tab).toLowerCase()}
+            {tab === 'Invoice' ? ' · grouped by upload month' : ''}
+          </div>
+          <div className="flex items-center gap-3">
+            {tab === 'License' ? (
+              <button
+                type="button"
+                onClick={() =>
+                  setLicenseSort((s) => (s === 'expiry' ? 'uploaded' : 'expiry'))
+                }
+                className="text-xs font-medium text-brand-700 hover:underline"
+              >
+                Sort:{' '}
+                {licenseSort === 'expiry'
+                  ? 'Expiring soonest'
+                  : 'Recently uploaded'}
+              </button>
+            ) : null}
+            {tab !== 'License' || licenseSort === 'uploaded' ? (
+              <button
+                type="button"
+                onClick={() =>
+                  setSortDir((d) => (d === 'newest' ? 'oldest' : 'newest'))
+                }
+                className="text-xs font-medium text-brand-700 hover:underline"
+              >
+                Sort: {sortDir === 'newest' ? 'Newest first' : 'Oldest first'}
+              </button>
+            ) : null}
+          </div>
+        </div>
+        {tabbedDocs.length === 0 ? (
           <div className="rounded-lg bg-slate-50 p-4 text-center text-sm text-slate-500">
-            No documents yet. Click "Upload document" to add one.
+            {tab === 'All'
+              ? 'No documents yet. Click "Upload document" to add one.'
+              : `No ${tabLabel(tab).toLowerCase()} yet. Click "Upload document" to add one.`}
           </div>
         ) : null}
         {groupedDocs.map((group) => (
           <div key={group.key} className="mb-4">
-            <h3 className="sticky top-16 z-10 -mx-5 mb-2 border-y border-slate-200 bg-slate-50/95 px-5 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-600 backdrop-blur">
-              {group.label}
-            </h3>
+            {group.label ? (
+              <h3 className="sticky top-16 z-10 -mx-5 mb-2 border-y border-slate-200 bg-slate-50/95 px-5 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-600 backdrop-blur">
+                {group.label}
+              </h3>
+            ) : null}
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
