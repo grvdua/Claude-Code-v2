@@ -13,6 +13,8 @@ import {
   Loader2,
   Sparkles,
   Receipt,
+  RefreshCw,
+  X,
 } from 'lucide-react';
 import { useStore, formatDate, daysUntil, formatINR } from '@/lib/store';
 import { useMounted } from '@/lib/useMounted';
@@ -90,6 +92,7 @@ export default function DocumentsPage() {
   const documents = useStore((s) => s.documents);
   const addDocument = useStore((s) => s.addDocument);
   const deleteDocument = useStore((s) => s.deleteDocument);
+  const renewDocument = useStore((s) => s.renewDocument);
   const processInvoiceExtraction = useStore((s) => s.processInvoiceExtraction);
   const role = useStore((s) => s.role);
 
@@ -140,6 +143,16 @@ export default function DocumentsPage() {
   const [licenseSort, setLicenseSort] = useState<'expiry' | 'uploaded'>(
     'expiry'
   );
+
+  // Bulk selection state (per-document ids).
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+
+  // Mark-as-renewed modal state.
+  const [renewModalOpen, setRenewModalOpen] = useState(false);
+  const [renewExpiry, setRenewExpiry] = useState('');
+  const [renewFile, setRenewFile] = useState<File | null>(null);
+  const renewInputRef = useRef<HTMLInputElement>(null);
 
   // Tracks object URLs we've handed out so we can revoke on unmount.
   const objectUrlsRef = useRef<string[]>([]);
@@ -371,6 +384,87 @@ export default function DocumentsPage() {
     }
   };
 
+  const toggleSelected = (docId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(docId)) next.delete(docId);
+      else next.add(docId);
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const bulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    if (
+      !confirm(
+        `Delete ${selectedIds.size} document${selectedIds.size === 1 ? '' : 's'}? This cannot be undone.`
+      )
+    )
+      return;
+    setBulkBusy(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const ids = Array.from(selectedIds);
+      for (const docId of ids) {
+        await deleteDocument(docId);
+      }
+      setSuccess(`Deleted ${ids.length} document${ids.length === 1 ? '' : 's'}.`);
+      clearSelection();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Bulk delete failed.');
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const openRenewModal = () => {
+    setRenewExpiry('');
+    setRenewFile(null);
+    if (renewInputRef.current) renewInputRef.current.value = '';
+    setRenewModalOpen(true);
+  };
+
+  const submitRenew = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccess(null);
+    if (!renewExpiry) {
+      setError('Please pick a new expiry date.');
+      return;
+    }
+    if (renewFile && renewFile.size > MAX_FILE_SIZE_BYTES) {
+      setError(
+        `Replacement file is ${formatFileSize(renewFile.size)} — must be under 25 MB.`
+      );
+      return;
+    }
+    setBulkBusy(true);
+    try {
+      const newIso = new Date(renewExpiry).toISOString();
+      let newFileId: string | undefined;
+      // Share one stored copy across all selected docs when a file is provided.
+      if (renewFile) {
+        newFileId = await saveFile(renewFile);
+      }
+      const ids = Array.from(selectedIds);
+      for (const docId of ids) {
+        await renewDocument(docId, newIso, newFileId);
+      }
+      setSuccess(
+        `Marked ${ids.length} document${ids.length === 1 ? '' : 's'} as renewed.`
+      );
+      clearSelection();
+      setRenewModalOpen(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Mark as renewed failed.');
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
   // Documents filtered by the current tab.
   const tabbedDocs = useMemo(() => {
     if (tab === 'All') return documents;
@@ -465,6 +559,40 @@ export default function DocumentsPage() {
     return 'Other';
   };
 
+  // All ids visible under the current tab — used for "select all".
+  const inViewIds = useMemo(
+    () => tabbedDocs.map((d) => d.id),
+    [tabbedDocs]
+  );
+  const allInViewSelected =
+    inViewIds.length > 0 && inViewIds.every((id) => selectedIds.has(id));
+  const someInViewSelected =
+    inViewIds.some((id) => selectedIds.has(id)) && !allInViewSelected;
+
+  const toggleAllInView = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allInViewSelected) {
+        for (const id of inViewIds) next.delete(id);
+      } else {
+        for (const id of inViewIds) next.add(id);
+      }
+      return next;
+    });
+  };
+
+  // "Mark as renewed" only applies to License/Agreement with an expiry date.
+  const selectedDocs = useMemo(
+    () => documents.filter((d) => selectedIds.has(d.id)),
+    [documents, selectedIds]
+  );
+  const canRenewSelection =
+    selectedDocs.length > 0 &&
+    selectedDocs.every(
+      (d) =>
+        (d.category === 'License' || d.category === 'Agreement') && !!d.expiryDate
+    );
+
   if (!mounted) return null;
 
   const PendingIcon = fileIconFor(pendingFile?.type);
@@ -473,8 +601,8 @@ export default function DocumentsPage() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Document vault</h1>
-          <p className="text-sm text-slate-600">
+          <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Document vault</h1>
+          <p className="text-sm text-slate-600 dark:text-slate-400">
             Licenses, agreements, bills, invoices and salary slips — stored
             locally in your browser.
           </p>
@@ -510,7 +638,7 @@ export default function DocumentsPage() {
 
       {showForm && canUpload ? (
         <section className="card p-5">
-          <h2 className="text-lg font-semibold text-slate-900">Upload document</h2>
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Upload document</h2>
 
           {/* Step A — file picker. Hidden once a file has been chosen. */}
           {!pendingFile ? (
@@ -527,15 +655,15 @@ export default function DocumentsPage() {
                   'flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed p-8 text-center text-sm transition',
                   dragOver
                     ? 'border-brand-500 bg-brand-50 text-brand-700'
-                    : 'border-slate-300 bg-slate-50 text-slate-600 hover:border-brand-400'
+                    : 'border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-600 dark:text-slate-300 hover:border-brand-400'
                 )}
               >
-                <FilePlus className="h-6 w-6 text-slate-400" />
+                <FilePlus className="h-6 w-6 text-slate-400 dark:text-slate-500" />
                 <div>
                   <span className="font-medium text-brand-700">Click to browse</span>{' '}
                   or drag and drop a file here
                 </div>
-                <div className="text-xs text-slate-500">
+                <div className="text-xs text-slate-500 dark:text-slate-400">
                   PDF or images, up to 25 MB. Files under 4 MB are auto-analyzed with AI.
                 </div>
                 <input
@@ -550,14 +678,14 @@ export default function DocumentsPage() {
           ) : (
             <div className="mt-3 space-y-3">
               {/* File preview */}
-              <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+              <div className="flex items-center justify-between rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 px-3 py-2">
                 <div className="flex items-center gap-2 min-w-0">
-                  <PendingIcon className="h-5 w-5 text-slate-500 shrink-0" />
+                  <PendingIcon className="h-5 w-5 text-slate-500 dark:text-slate-400 shrink-0" />
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-medium text-slate-800">
+                    <div className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">
                       {pendingFile.name}
                     </div>
-                    <div className="text-xs text-slate-500">
+                    <div className="text-xs text-slate-500 dark:text-slate-400">
                       {formatFileSize(pendingFile.size)} ·{' '}
                       {pendingFile.type || 'unknown type'}
                     </div>
@@ -565,7 +693,7 @@ export default function DocumentsPage() {
                 </div>
                 <button
                   type="button"
-                  className="text-xs font-medium text-slate-600 hover:text-rose-600"
+                  className="text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-rose-600"
                   onClick={() => resetForm()}
                   disabled={analyzing || uploading}
                 >
@@ -582,7 +710,7 @@ export default function DocumentsPage() {
                   <Sparkles className="h-3.5 w-3.5" /> AI-extracted — review and edit if needed
                 </div>
               ) : aiNotice ? (
-                <div className="text-xs text-slate-500">{aiNotice}</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">{aiNotice}</div>
               ) : null}
 
               {pendingInvoice ? (
@@ -595,13 +723,13 @@ export default function DocumentsPage() {
                     {pendingInvoice.lineItems.length === 1 ? '' : 's'}
                   </div>
                   {pendingInvoice.lineItems.length > 0 ? (
-                    <ul className="mt-2 max-h-32 overflow-y-auto rounded bg-white p-2 text-xs ring-1 ring-violet-100">
+                    <ul className="mt-2 max-h-32 overflow-y-auto rounded bg-white dark:bg-slate-900 p-2 text-xs ring-1 ring-violet-100">
                       {pendingInvoice.lineItems.map((li, i) => (
                         <li key={i} className="flex justify-between py-0.5">
                           <span>
                             {li.quantity} {li.unit} · {li.name}
                           </span>
-                          <span className="tabular-nums text-slate-500">
+                          <span className="tabular-nums text-slate-500 dark:text-slate-400">
                             {formatINR(li.totalPrice)}
                           </span>
                         </li>
@@ -713,7 +841,7 @@ export default function DocumentsPage() {
                 <div>
                   <label className="label">
                     Date of issue{' '}
-                    <span className="text-slate-400">(optional)</span>
+                    <span className="text-slate-400 dark:text-slate-500">(optional)</span>
                   </label>
                   <input
                     className="input"
@@ -728,7 +856,7 @@ export default function DocumentsPage() {
                     {EXPIRY_REQUIRED.includes(category) ? (
                       <span className="text-rose-600">*</span>
                     ) : (
-                      <span className="text-slate-400">(optional)</span>
+                      <span className="text-slate-400 dark:text-slate-500">(optional)</span>
                     )}
                   </label>
                   <input
@@ -784,7 +912,7 @@ export default function DocumentsPage() {
 
       <section className="card p-5">
         {/* Top-level category tabs */}
-        <div className="mb-4 -mx-5 overflow-x-auto border-b border-slate-200 px-5">
+        <div className="mb-4 -mx-5 overflow-x-auto border-b border-slate-200 dark:border-slate-800 px-5">
           <div className="flex gap-1">
             {TABS.map((k) => {
               const active = tab === k;
@@ -798,7 +926,7 @@ export default function DocumentsPage() {
                     '-mb-px whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition',
                     active
                       ? 'border-brand-600 text-brand-700'
-                      : 'border-transparent text-slate-500 hover:text-slate-700'
+                      : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
                   )}
                 >
                   {tabLabel(k)}{' '}
@@ -807,7 +935,7 @@ export default function DocumentsPage() {
                       'ml-1 rounded-full px-1.5 py-0.5 text-xs',
                       active
                         ? 'bg-brand-100 text-brand-700'
-                        : 'bg-slate-100 text-slate-500'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
                     )}
                   >
                     {count}
@@ -819,7 +947,7 @@ export default function DocumentsPage() {
         </div>
 
         <div className="mb-3 flex items-center justify-between gap-3">
-          <div className="text-sm text-slate-500">
+          <div className="text-sm text-slate-500 dark:text-slate-400">
             {tabbedDocs.length} {tabLabel(tab).toLowerCase()}
             {tab === 'Invoice' ? ' · grouped by upload month' : ''}
           </div>
@@ -852,7 +980,7 @@ export default function DocumentsPage() {
           </div>
         </div>
         {tabbedDocs.length === 0 ? (
-          <div className="rounded-lg bg-slate-50 p-4 text-center text-sm text-slate-500">
+          <div className="rounded-lg bg-slate-50 dark:bg-slate-900/50 p-4 text-center text-sm text-slate-500 dark:text-slate-400">
             {tab === 'All'
               ? 'No documents yet. Click "Upload document" to add one.'
               : `No ${tabLabel(tab).toLowerCase()} yet. Click "Upload document" to add one.`}
@@ -861,14 +989,29 @@ export default function DocumentsPage() {
         {groupedDocs.map((group) => (
           <div key={group.key} className="mb-4">
             {group.label ? (
-              <h3 className="sticky top-16 z-10 -mx-5 mb-2 border-y border-slate-200 bg-slate-50/95 px-5 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-600 backdrop-blur">
+              <h3 className="sticky top-16 z-10 -mx-5 mb-2 border-y border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50/95 px-5 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300 backdrop-blur">
                 {group.label}
               </h3>
             ) : null}
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-slate-200">
+                  <tr className="border-b border-slate-200 dark:border-slate-800">
+                    {canUpload ? (
+                      <th className="table-th w-8">
+                        <input
+                          type="checkbox"
+                          aria-label="Select all in view"
+                          className="h-4 w-4 rounded border-slate-300 dark:border-slate-700 text-brand-600 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-800"
+                          checked={allInViewSelected}
+                          ref={(el) => {
+                            if (el) el.indeterminate = someInViewSelected;
+                          }}
+                          onChange={toggleAllInView}
+                          title="Select all in view"
+                        />
+                      </th>
+                    ) : null}
                     <th className="table-th">Name</th>
                     <th className="table-th">Category</th>
                     <th className="table-th">Issuer</th>
@@ -878,21 +1021,37 @@ export default function DocumentsPage() {
                     <th className="table-th text-right">File</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {group.docs.map((d) => {
                 const days = daysUntil(d.expiryDate);
                 const hasExpiry = !!d.expiryDate;
                 const expired = hasExpiry && days < 0;
                 const soon = hasExpiry && !expired && days <= 30;
                 const Icon = fileIconFor(d.fileType);
+                const isSelected = selectedIds.has(d.id);
                 return (
                   <tr
                     key={d.id}
-                    className={clsx(expired && 'bg-rose-50/60', soon && 'bg-amber-50/60')}
+                    className={clsx(
+                      expired && 'bg-rose-50/60 dark:bg-rose-950/30',
+                      soon && !expired && 'bg-amber-50/60 dark:bg-amber-950/30',
+                      isSelected && 'bg-brand-50/40 dark:bg-brand-900/20'
+                    )}
                   >
+                    {canUpload ? (
+                      <td className="table-td">
+                        <input
+                          type="checkbox"
+                          aria-label={`Select ${d.name}`}
+                          className="h-4 w-4 rounded border-slate-300 dark:border-slate-700 text-brand-600 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-800"
+                          checked={isSelected}
+                          onChange={() => toggleSelected(d.id)}
+                        />
+                      </td>
+                    ) : null}
                     <td className="table-td">
                       <div className="flex items-center gap-2">
-                        <Icon className="h-4 w-4 text-slate-400" />
+                        <Icon className="h-4 w-4 text-slate-400 dark:text-slate-500" />
                         <div className="min-w-0">
                           <div className="font-medium flex items-center gap-1">
                             <span className="truncate">{d.name}</span>
@@ -904,33 +1063,33 @@ export default function DocumentsPage() {
                             ) : null}
                           </div>
                           {d.documentType ? (
-                            <div className="text-xs text-slate-500">
+                            <div className="text-xs text-slate-500 dark:text-slate-400">
                               {d.documentType}
                             </div>
                           ) : null}
                           {d.licenseNumber ? (
-                            <div className="text-xs text-slate-500">
+                            <div className="text-xs text-slate-500 dark:text-slate-400">
                               No. {d.licenseNumber}
                             </div>
                           ) : null}
                           {d.fileName ? (
-                            <div className="text-xs text-slate-400">{d.fileName}</div>
+                            <div className="text-xs text-slate-400 dark:text-slate-500">{d.fileName}</div>
                           ) : null}
                         </div>
                       </div>
                     </td>
                     <td className="table-td">{d.category}</td>
-                    <td className="table-td text-xs text-slate-600">
+                    <td className="table-td text-xs text-slate-600 dark:text-slate-300">
                       {d.issuingAuthority ? (
                         <div>{d.issuingAuthority}</div>
                       ) : (
-                        <span className="text-slate-400">—</span>
+                        <span className="text-slate-400 dark:text-slate-500">—</span>
                       )}
                       {d.registeredEntity ? (
-                        <div className="text-slate-400">to {d.registeredEntity}</div>
+                        <div className="text-slate-400 dark:text-slate-500">to {d.registeredEntity}</div>
                       ) : null}
                     </td>
-                    <td className="table-td text-xs text-slate-600">
+                    <td className="table-td text-xs text-slate-600 dark:text-slate-300">
                       {d.dateOfIssue ? formatDate(d.dateOfIssue) : '—'}
                     </td>
                     <td className="table-td">
@@ -938,7 +1097,7 @@ export default function DocumentsPage() {
                     </td>
                     <td className="table-td">
                       {!hasExpiry ? (
-                        <span className="text-xs text-slate-400">—</span>
+                        <span className="text-xs text-slate-400 dark:text-slate-500">—</span>
                       ) : expired ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-700 ring-1 ring-rose-200">
                           <AlertTriangle className="h-3 w-3" /> Expired {Math.abs(days)}d ago
@@ -973,7 +1132,7 @@ export default function DocumentsPage() {
                             </button>
                           </>
                         ) : (
-                          <span className="text-xs text-slate-400" title="Legacy entry — no file attached">
+                          <span className="text-xs text-slate-400 dark:text-slate-500" title="Legacy entry — no file attached">
                             metadata only
                           </span>
                         )}
@@ -997,6 +1156,134 @@ export default function DocumentsPage() {
           </div>
         ))}
       </section>
+
+      {/* Floating bulk action bar */}
+      {canUpload && selectedIds.size > 0 ? (
+        <div className="fixed inset-x-0 bottom-4 z-40 mx-auto flex w-fit max-w-[95vw] items-center gap-3 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-2 shadow-lg dark:border-slate-700 dark:bg-slate-900">
+          <span className="text-sm font-medium text-slate-900 dark:text-slate-100">
+            {selectedIds.size} selected
+          </span>
+          <button
+            type="button"
+            onClick={openRenewModal}
+            disabled={!canRenewSelection || bulkBusy}
+            title={
+              canRenewSelection
+                ? 'Mark selected licenses/agreements as renewed'
+                : 'Select only Licenses or Agreements with expiry dates to enable'
+            }
+            className="btn btn-secondary text-xs"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Mark as renewed
+          </button>
+          <button
+            type="button"
+            onClick={bulkDelete}
+            disabled={bulkBusy}
+            className="btn btn-danger text-xs"
+          >
+            {bulkBusy ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Trash2 className="h-3.5 w-3.5" />
+            )}
+            Delete
+          </button>
+          <button
+            type="button"
+            onClick={clearSelection}
+            className="text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+          >
+            <X className="h-3.5 w-3.5 inline" />
+            Clear
+          </button>
+        </div>
+      ) : null}
+
+      {/* Mark as renewed modal */}
+      {renewModalOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
+          onClick={() => {
+            if (!bulkBusy) setRenewModalOpen(false);
+          }}
+        >
+          <div
+            className="card w-full max-w-md p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                Mark as renewed
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!bulkBusy) setRenewModalOpen(false);
+                }}
+                className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="mb-3 text-sm text-slate-600 dark:text-slate-300">
+              Updating expiry for {selectedIds.size} document
+              {selectedIds.size === 1 ? '' : 's'}. Optionally replace the file —
+              the old file will be removed from local storage.
+            </p>
+            <form onSubmit={submitRenew} className="space-y-3">
+              <div>
+                <label className="label">New expiry date *</label>
+                <input
+                  type="date"
+                  className="input"
+                  value={renewExpiry}
+                  onChange={(e) => setRenewExpiry(e.target.value)}
+                  required
+                />
+              </div>
+              <div>
+                <label className="label">
+                  Replacement file (optional)
+                </label>
+                <input
+                  ref={renewInputRef}
+                  type="file"
+                  accept="image/*,application/pdf"
+                  onChange={(e) => setRenewFile(e.target.files?.[0] ?? null)}
+                  className="block w-full text-sm text-slate-600 dark:text-slate-300 file:mr-3 file:rounded-md file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-brand-700 hover:file:bg-brand-100 dark:text-slate-300 dark:file:bg-brand-900/40 dark:file:text-brand-200"
+                />
+                {renewFile ? (
+                  <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    {renewFile.name} · {formatFileSize(renewFile.size)}
+                  </div>
+                ) : null}
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setRenewModalOpen(false)}
+                  disabled={bulkBusy}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={bulkBusy}>
+                  {bulkBusy ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" /> Saving...
+                    </>
+                  ) : (
+                    'Save renewal'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

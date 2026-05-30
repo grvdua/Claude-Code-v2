@@ -143,7 +143,7 @@ export function VoiceInputButton({
         'inline-flex items-center justify-center rounded-md p-1.5 ring-1 transition',
         listening
           ? 'bg-rose-50 text-rose-600 ring-rose-200 animate-pulse'
-          : 'bg-white text-slate-500 ring-slate-200 hover:bg-slate-50',
+          : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 ring-slate-200 dark:ring-slate-800 hover:bg-slate-50 dark:bg-slate-900/50',
         className
       )}
     >

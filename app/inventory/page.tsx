@@ -113,7 +113,7 @@ const URGENCY_STYLES: Record<ReorderUrgency, string> = {
   critical: 'bg-rose-50 text-rose-700 ring-rose-200',
   high: 'bg-amber-50 text-amber-700 ring-amber-200',
   medium: 'bg-sky-50 text-sky-700 ring-sky-200',
-  low: 'bg-slate-50 text-slate-600 ring-slate-200',
+  low: 'bg-slate-50 dark:bg-slate-900/50 text-slate-600 dark:text-slate-300 ring-slate-200 dark:ring-slate-800',
 };
 
 function PriceTrendIcon({ trend }: { trend: ReorderPriceTrend }) {
@@ -123,7 +123,7 @@ function PriceTrendIcon({ trend }: { trend: ReorderPriceTrend }) {
     return (
       <ArrowDownRight className="h-4 w-4 text-emerald-600" aria-label="Falling" />
     );
-  return <ArrowRight className="h-4 w-4 text-slate-500" aria-label="Stable" />;
+  return <ArrowRight className="h-4 w-4 text-slate-500 dark:text-slate-400" aria-label="Stable" />;
 }
 
 function relativeTime(iso: string): string {
@@ -485,8 +485,8 @@ export default function InventoryPage() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Inventory</h1>
-          <p className="text-sm text-slate-600">
+          <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Inventory</h1>
+          <p className="text-sm text-slate-600 dark:text-slate-300">
             Live stock across Restaurant, Store 1 and Store 2. Items at or below reorder level are highlighted.
           </p>
         </div>
@@ -520,7 +520,7 @@ export default function InventoryPage() {
 
       {showAdd && canEdit ? (
         <section className="card p-5">
-          <h2 className="text-lg font-semibold text-slate-900">Add inventory item</h2>
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Add inventory item</h2>
           <form onSubmit={submit} className="mt-3 grid gap-3 sm:grid-cols-3">
             <div className="sm:col-span-2">
               <label className="label">Name</label>
@@ -586,7 +586,7 @@ export default function InventoryPage() {
                 }}
               />
               {suggestedReorder !== undefined && !reorderTouched ? (
-                <div className="mt-0.5 text-xs text-slate-500">
+                <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                   Suggested based on {category.trim()} category avg.
                 </div>
               ) : null}
@@ -612,13 +612,13 @@ export default function InventoryPage() {
 
       <section className="card flex flex-wrap items-center justify-between gap-3 p-5">
         <div>
-          <div className="text-xs uppercase tracking-wide text-slate-500">
+          <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
             Total inventory value
           </div>
-          <div className="mt-0.5 text-2xl font-semibold text-slate-900">
+          <div className="mt-0.5 text-2xl font-semibold text-slate-900 dark:text-slate-100">
             {totalInventoryValue > 0 ? formatLakhCrore(totalInventoryValue) : '—'}
           </div>
-          <div className="text-xs text-slate-500">
+          <div className="text-xs text-slate-500 dark:text-slate-400">
             {pricedItemsCount} of {inventory.length} items priced
             {inventory.length > 0 && pricedItemsCount < inventory.length
               ? ' (add unit prices on remaining items to refine)'
@@ -630,17 +630,17 @@ export default function InventoryPage() {
       <section className="card p-5">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900">
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
               Inventory value — last 30 days
             </h2>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
               End-of-day snapshots derived from stock movements.
             </p>
           </div>
         </div>
         <div className="mt-3">
           {valueTrend.length === 0 ? (
-            <div className="rounded-lg bg-slate-50 p-4 text-center text-sm text-slate-500">
+            <div className="rounded-lg bg-slate-50 dark:bg-slate-900/50 p-4 text-center text-sm text-slate-500 dark:text-slate-400">
               Track stock movements to see value trend here.
             </div>
           ) : (
@@ -658,18 +658,18 @@ export default function InventoryPage() {
         <section id="reorder-suggestions" className="card p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
+              <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-900 dark:text-slate-100">
                 <Brain className="h-5 w-5 text-violet-600" />
                 AI reorder suggestions
               </h2>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 Consumption velocity, days-of-supply and price trend for items
                 near or below reorder level.
               </p>
               {lastReorderPrediction ? (
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                   Last analyzed:{' '}
-                  <span className="font-medium text-slate-700">
+                  <span className="font-medium text-slate-700 dark:text-slate-200">
                     {relativeTime(lastReorderPrediction.generatedAt)}
                   </span>
                 </p>
@@ -710,7 +710,7 @@ export default function InventoryPage() {
           ) : null}
 
           {!lastReorderPrediction && !predicting && !predictError ? (
-            <div className="mt-3 rounded-lg bg-slate-50 p-4 text-sm text-slate-500">
+            <div className="mt-3 rounded-lg bg-slate-50 dark:bg-slate-900/50 p-4 text-sm text-slate-500 dark:text-slate-400">
               No analysis yet. Click &ldquo;Analyze stock&rdquo; to ask Claude for
               prioritised reorder recommendations.
             </div>
@@ -730,7 +730,7 @@ export default function InventoryPage() {
           <div className="min-w-[12rem] flex-1">
             <label className="label">Search</label>
             <div className="relative">
-              <Search className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Search className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
               <input
                 className="input pl-8"
                 placeholder="Search by name or category…"
@@ -782,7 +782,7 @@ export default function InventoryPage() {
           >
             <Download className="h-4 w-4" /> Export CSV
           </button>
-          <div className="ml-auto text-sm text-slate-500">
+          <div className="ml-auto text-sm text-slate-500 dark:text-slate-400">
             {filtered.length} items{' '}
             <span className="ml-2 inline-flex items-center gap-1">
               <span className="inline-block h-2 w-2 rounded-full bg-rose-500" /> low stock
@@ -793,7 +793,7 @@ export default function InventoryPage() {
         <div className="mt-4 overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-slate-200">
+              <tr className="border-b border-slate-200 dark:border-slate-800">
                 {canEdit ? (
                   <th className="table-th w-8">
                     <input
@@ -817,7 +817,7 @@ export default function InventoryPage() {
                 {canEdit ? <th className="table-th text-right">Adjust</th> : null}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {filtered.map((i) => {
                 const low = i.quantity <= i.reorderLevel;
                 const isSelected = selected.has(i.id);
@@ -851,7 +851,7 @@ export default function InventoryPage() {
                       {i.quantity} {i.unit}
                     </td>
                     <td className="table-td text-right tabular-nums">
-                      {i.unitPrice ? formatINR(i.unitPrice) : <span className="text-slate-400">—</span>}
+                      {i.unitPrice ? formatINR(i.unitPrice) : <span className="text-slate-400 dark:text-slate-500">—</span>}
                     </td>
                     <td className="table-td text-right tabular-nums">{i.reorderLevel}</td>
                     <td className="table-td text-right">
@@ -888,7 +888,7 @@ export default function InventoryPage() {
             </tbody>
           </table>
           {filtered.length === 0 ? (
-            <div className="rounded-lg bg-slate-50 p-4 text-center text-sm text-slate-500">
+            <div className="rounded-lg bg-slate-50 dark:bg-slate-900/50 p-4 text-center text-sm text-slate-500 dark:text-slate-400">
               {inventory.length === 0
                 ? 'No inventory items yet. Click "Add item" or "Upload invoice" to start.'
                 : 'No items match the current filters.'}
@@ -900,8 +900,8 @@ export default function InventoryPage() {
       {/* Floating action bar for bulk selection */}
       {canEdit && selected.size > 0 ? (
         <div className="fixed inset-x-0 bottom-4 z-40 flex justify-center px-4">
-          <div className="flex items-center gap-3 rounded-full border border-slate-200 bg-white px-4 py-2 shadow-lg">
-            <span className="text-sm font-medium text-slate-700">
+          <div className="flex items-center gap-3 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-2 shadow-lg">
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
               {selected.size} selected
             </span>
             <button
@@ -984,7 +984,7 @@ function ReorderPredictionsTable({
 
   if (sorted.length === 0) {
     return (
-      <div className="mt-3 rounded-lg bg-slate-50 p-4 text-sm text-slate-500">
+      <div className="mt-3 rounded-lg bg-slate-50 dark:bg-slate-900/50 p-4 text-sm text-slate-500 dark:text-slate-400">
         The AI returned no reorder recommendations.
         {prediction.summary ? (
           <div className="mt-1 italic">{prediction.summary}</div>
@@ -1011,7 +1011,7 @@ function ReorderPredictionsTable({
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+            <tr className="border-b border-slate-200 dark:border-slate-800 text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
               <th className="py-2 pr-2">Item</th>
               <th className="py-2 pr-2">Urgency</th>
               <th className="py-2 pr-2 text-right">Recommended qty</th>
@@ -1021,7 +1021,7 @@ function ReorderPredictionsTable({
               <th className="py-2 pr-2">Why</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {sorted.map((rec) => {
               const item = inventory.find((i) => i.id === rec.itemId);
               const isOpen = expanded.has(rec.itemId);
@@ -1033,11 +1033,11 @@ function ReorderPredictionsTable({
               return (
                 <tr key={rec.itemId} className="align-top">
                   <td className="py-2 pr-2">
-                    <div className="font-medium text-slate-900">
+                    <div className="font-medium text-slate-900 dark:text-slate-100">
                       {item?.name ?? rec.itemId}
                     </div>
                     {item ? (
-                      <div className="text-xs text-slate-500">
+                      <div className="text-xs text-slate-500 dark:text-slate-400">
                         {item.quantity} {item.unit} on hand · reorder at{' '}
                         {item.reorderLevel}
                       </div>
@@ -1069,7 +1069,7 @@ function ReorderPredictionsTable({
                   <td className="py-2 pr-2 text-center">
                     <PriceTrendIcon trend={rec.priceTrend} />
                   </td>
-                  <td className="py-2 pr-2 text-slate-700">
+                  <td className="py-2 pr-2 text-slate-700 dark:text-slate-200">
                     <div>{isOpen ? reasoning : truncated}</div>
                     {reasoning.length > 110 ? (
                       <button
@@ -1130,16 +1130,16 @@ function ReorderDetailsModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-4xl rounded-xl bg-white shadow-xl"
+        className="w-full max-w-4xl rounded-xl bg-white dark:bg-slate-900 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
+        <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 px-5 py-3">
           <div>
-            <div className="flex items-center gap-2 text-lg font-semibold text-slate-900">
+            <div className="flex items-center gap-2 text-lg font-semibold text-slate-900 dark:text-slate-100">
               <Brain className="h-5 w-5 text-violet-600" /> Reorder analysis —
               detailed view
             </div>
-            <div className="text-xs text-slate-500">
+            <div className="text-xs text-slate-500 dark:text-slate-400">
               Generated {formatDateTime(generatedAt)} ·{' '}
               {relativeTime(generatedAt)}
             </div>
@@ -1147,7 +1147,7 @@ function ReorderDetailsModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full p-1 text-slate-500 hover:bg-slate-100"
+            className="rounded-full p-1 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:bg-slate-800"
             aria-label="Close"
           >
             <X className="h-5 w-5" />
@@ -1160,7 +1160,7 @@ function ReorderDetailsModal({
             </div>
           ) : null}
           {sorted.length === 0 ? (
-            <div className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500">
+            <div className="rounded-lg bg-slate-50 dark:bg-slate-900/50 p-4 text-sm text-slate-500 dark:text-slate-400">
               No per-item recommendations to show.
             </div>
           ) : (
@@ -1210,11 +1210,11 @@ function ReorderDetailCard({
   }, [priceHistory, item]);
 
   return (
-    <div className="rounded-lg border border-slate-200 p-4">
+    <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <div className="text-base font-semibold text-slate-900">
+            <div className="text-base font-semibold text-slate-900 dark:text-slate-100">
               {item?.name ?? rec.itemId}
             </div>
             <span
@@ -1228,7 +1228,7 @@ function ReorderDetailCard({
             <PriceTrendIcon trend={rec.priceTrend} />
           </div>
           {item ? (
-            <div className="mt-0.5 text-xs text-slate-500">
+            <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
               {item.quantity} {item.unit} on hand · reorder at{' '}
               {item.reorderLevel} · {locationLabel[item.location]}
             </div>
@@ -1236,28 +1236,28 @@ function ReorderDetailCard({
         </div>
         <div className="grid grid-cols-3 gap-3 text-right text-xs">
           <div>
-            <div className="uppercase tracking-wide text-slate-500">
+            <div className="uppercase tracking-wide text-slate-500 dark:text-slate-400">
               Recommend
             </div>
-            <div className="text-sm font-semibold text-slate-900">
+            <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
               {rec.recommendedQuantity} {item?.unit ?? ''}
             </div>
           </div>
           <div>
-            <div className="uppercase tracking-wide text-slate-500">
+            <div className="uppercase tracking-wide text-slate-500 dark:text-slate-400">
               Days left
             </div>
-            <div className="text-sm font-semibold text-slate-900">
+            <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
               {rec.estimatedDaysUntilStockout >= 999
                 ? '—'
                 : `${rec.estimatedDaysUntilStockout}d`}
             </div>
           </div>
           <div>
-            <div className="uppercase tracking-wide text-slate-500">
+            <div className="uppercase tracking-wide text-slate-500 dark:text-slate-400">
               Spend
             </div>
-            <div className="text-sm font-semibold text-slate-900">
+            <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
               {rec.projectedSpendINR > 0
                 ? formatINR(rec.projectedSpendINR)
                 : '—'}
@@ -1267,26 +1267,26 @@ function ReorderDetailCard({
       </div>
 
       {rec.reasoning ? (
-        <p className="mt-3 text-sm text-slate-700">{rec.reasoning}</p>
+        <p className="mt-3 text-sm text-slate-700 dark:text-slate-200">{rec.reasoning}</p>
       ) : null}
 
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <div>
-          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
             Recent stock adjustments
           </div>
           {itemAdjustments.length === 0 ? (
-            <div className="rounded-lg bg-slate-50 p-2 text-xs text-slate-500">
+            <div className="rounded-lg bg-slate-50 dark:bg-slate-900/50 p-2 text-xs text-slate-500 dark:text-slate-400">
               No stock movements recorded yet.
             </div>
           ) : (
-            <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200">
+            <ul className="divide-y divide-slate-100 dark:divide-slate-800 rounded-lg border border-slate-200 dark:border-slate-800">
               {itemAdjustments.map((a) => (
                 <li
                   key={a.id}
                   className="flex items-center justify-between px-2 py-1 text-xs"
                 >
-                  <span className="text-slate-500">
+                  <span className="text-slate-500 dark:text-slate-400">
                     {formatDateTime(a.adjustedAt)}
                   </span>
                   <span
@@ -1298,7 +1298,7 @@ function ReorderDetailCard({
                     {a.delta >= 0 ? '+' : ''}
                     {a.delta}
                   </span>
-                  <span className="ml-2 truncate text-slate-600">
+                  <span className="ml-2 truncate text-slate-600 dark:text-slate-300">
                     {a.reason}
                   </span>
                 </li>
@@ -1307,25 +1307,25 @@ function ReorderDetailCard({
           )}
         </div>
         <div>
-          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
             Last 5 prices paid
           </div>
           {lastPrices.length === 0 ? (
-            <div className="rounded-lg bg-slate-50 p-2 text-xs text-slate-500">
+            <div className="rounded-lg bg-slate-50 dark:bg-slate-900/50 p-2 text-xs text-slate-500 dark:text-slate-400">
               No recorded purchases yet.
             </div>
           ) : (
-            <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200">
+            <ul className="divide-y divide-slate-100 dark:divide-slate-800 rounded-lg border border-slate-200 dark:border-slate-800">
               {lastPrices.map((p) => (
                 <li
                   key={p.id}
                   className="flex items-center justify-between px-2 py-1 text-xs"
                 >
-                  <span className="text-slate-500">{formatDate(p.date)}</span>
-                  <span className="tabular-nums font-semibold text-slate-800">
+                  <span className="text-slate-500 dark:text-slate-400">{formatDate(p.date)}</span>
+                  <span className="tabular-nums font-semibold text-slate-800 dark:text-slate-100">
                     {formatINR(p.unitPrice)}
                   </span>
-                  <span className="ml-2 truncate text-slate-600">
+                  <span className="ml-2 truncate text-slate-600 dark:text-slate-300">
                     {p.vendorName ?? '—'}
                   </span>
                 </li>
@@ -1555,17 +1555,17 @@ function InvoiceUploadModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-3xl rounded-xl bg-white shadow-xl"
+        className="w-full max-w-3xl rounded-xl bg-white dark:bg-slate-900 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
-          <div className="flex items-center gap-2 text-lg font-semibold text-slate-900">
+        <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 px-5 py-3">
+          <div className="flex items-center gap-2 text-lg font-semibold text-slate-900 dark:text-slate-100">
             <Receipt className="h-5 w-5 text-brand-600" /> Upload invoice
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full p-1 text-slate-500 hover:bg-slate-100"
+            className="rounded-full p-1 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:bg-slate-800"
             aria-label="Close"
           >
             <X className="h-5 w-5" />
@@ -1596,15 +1596,15 @@ function InvoiceUploadModal({
                 'flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed p-8 text-center text-sm transition',
                 dragOver
                   ? 'border-brand-500 bg-brand-50 text-brand-700'
-                  : 'border-slate-300 bg-slate-50 text-slate-600 hover:border-brand-400'
+                  : 'border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-600 dark:text-slate-300 hover:border-brand-400'
               )}
             >
-              <Upload className="h-6 w-6 text-slate-400" />
+              <Upload className="h-6 w-6 text-slate-400 dark:text-slate-500" />
               <div>
                 <span className="font-medium text-brand-700">Click to browse</span>{' '}
                 or drag a PDF or image of the invoice here
               </div>
-              <div className="text-xs text-slate-500">
+              <div className="text-xs text-slate-500 dark:text-slate-400">
                 Files under 4 MB are auto-analyzed with AI.
               </div>
               <input
@@ -1617,12 +1617,12 @@ function InvoiceUploadModal({
             </div>
           ) : (
             <div className="space-y-3">
-              <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+              <div className="flex items-center justify-between rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 px-3 py-2 text-sm">
                 <div className="min-w-0">
-                  <div className="truncate font-medium text-slate-800">
+                  <div className="truncate font-medium text-slate-800 dark:text-slate-100">
                     {file.name}
                   </div>
-                  <div className="text-xs text-slate-500">
+                  <div className="text-xs text-slate-500 dark:text-slate-400">
                     {formatFileSize(file.size)} · {file.type || 'unknown'}
                   </div>
                 </div>
@@ -1634,7 +1634,7 @@ function InvoiceUploadModal({
                     setLines([]);
                     setVendorName('');
                   }}
-                  className="text-xs font-medium text-slate-600 hover:text-rose-600"
+                  className="text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-rose-600"
                   disabled={analyzing || applying}
                 >
                   Choose different file
@@ -1676,14 +1676,14 @@ function InvoiceUploadModal({
                   </button>
                 </div>
                 {lines.length === 0 ? (
-                  <div className="rounded-lg bg-slate-50 p-3 text-center text-xs text-slate-500">
+                  <div className="rounded-lg bg-slate-50 dark:bg-slate-900/50 p-3 text-center text-xs text-slate-500 dark:text-slate-400">
                     No line items yet. Add one to apply to inventory.
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
-                        <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+                        <tr className="border-b border-slate-200 dark:border-slate-800 text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
                           <th className="py-1 pr-2">Item</th>
                           <th className="py-1 pr-2 w-20">Qty</th>
                           <th className="py-1 pr-2 w-24">Unit</th>
@@ -1691,7 +1691,7 @@ function InvoiceUploadModal({
                           <th className="py-1 w-8" />
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100">
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                         {lines.map((line, i) => (
                           <tr key={i}>
                             <td className="py-1 pr-2">
@@ -1740,7 +1740,7 @@ function InvoiceUploadModal({
                               <button
                                 type="button"
                                 onClick={() => removeLine(i)}
-                                className="text-slate-400 hover:text-rose-600"
+                                className="text-slate-400 dark:text-slate-500 hover:text-rose-600"
                                 aria-label="Remove line"
                               >
                                 <X className="h-4 w-4" />
@@ -1754,7 +1754,7 @@ function InvoiceUploadModal({
                 )}
               </div>
 
-              <div className="flex flex-wrap gap-2 border-t border-slate-200 pt-3">
+              <div className="flex flex-wrap gap-2 border-t border-slate-200 dark:border-slate-800 pt-3">
                 <button
                   type="button"
                   onClick={() => apply(false)}
@@ -1815,20 +1815,20 @@ function StockHistoryModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-2xl rounded-xl bg-white shadow-xl"
+        className="w-full max-w-2xl rounded-xl bg-white dark:bg-slate-900 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
+        <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 px-5 py-3">
           <div>
-            <div className="text-lg font-semibold text-slate-900">
+            <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
               Stock history
             </div>
-            <div className="text-xs text-slate-500">{itemName || itemId}</div>
+            <div className="text-xs text-slate-500 dark:text-slate-400">{itemName || itemId}</div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full p-1 text-slate-500 hover:bg-slate-100"
+            className="rounded-full p-1 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:bg-slate-800"
             aria-label="Close"
           >
             <X className="h-5 w-5" />
@@ -1836,7 +1836,7 @@ function StockHistoryModal({
         </div>
         <div className="p-5">
           {history.length === 0 ? (
-            <div className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500">
+            <div className="rounded-lg bg-slate-50 dark:bg-slate-900/50 p-4 text-sm text-slate-500 dark:text-slate-400">
               No adjustments yet. Stock changes from invoices, GRNs and manual
               edits will show up here.
             </div>
@@ -1844,7 +1844,7 @@ function StockHistoryModal({
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+                  <tr className="border-b border-slate-200 dark:border-slate-800 text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
                     <th className="py-1 pr-2">Date</th>
                     <th className="py-1 pr-2 text-right">Delta</th>
                     <th className="py-1 pr-2">Reason</th>
@@ -1852,10 +1852,10 @@ function StockHistoryModal({
                     <th className="py-1">Source</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {history.map((h) => (
                     <tr key={h.id}>
-                      <td className="py-1 pr-2 text-xs text-slate-600">
+                      <td className="py-1 pr-2 text-xs text-slate-600 dark:text-slate-300">
                         {formatDateTime(h.adjustedAt)}
                       </td>
                       <td
@@ -1867,12 +1867,12 @@ function StockHistoryModal({
                         {h.delta >= 0 ? '+' : ''}
                         {h.delta}
                       </td>
-                      <td className="py-1 pr-2 text-slate-700">{h.reason}</td>
+                      <td className="py-1 pr-2 text-slate-700 dark:text-slate-200">{h.reason}</td>
                       <td className="py-1 pr-2 text-right tabular-nums">
                         {h.resultingQuantity}
                       </td>
                       <td className="py-1 text-xs">
-                        <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-slate-600">
+                        <span className="inline-flex rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[10px] uppercase tracking-wide text-slate-600 dark:text-slate-300">
                           {h.source ?? 'manual'}
                         </span>
                       </td>

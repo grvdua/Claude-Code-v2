@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   CheckCircle2,
@@ -14,9 +14,12 @@ import {
   TrendingUp,
   Truck,
   Brain,
+  Wallet,
+  Trash2,
 } from 'lucide-react';
 import { KpiCard } from '@/components/KpiCard';
 import { StatusBadge } from '@/components/StatusBadge';
+import { LineChart } from '@/components/charts/LineChart';
 import {
   useStore,
   PO_APPROVAL_THRESHOLD,
@@ -40,8 +43,16 @@ export default function OwnerPage() {
   const vendorLedger = useStore((s) => s.vendorLedger);
   const priceHistory = useStore((s) => s.priceHistory);
   const lastReorderPrediction = useStore((s) => s.lastReorderPrediction);
+  const revenue = useStore((s) => s.revenue);
+  const addRevenue = useStore((s) => s.addRevenue);
+  const deleteRevenue = useStore((s) => s.deleteRevenue);
   const approvePO = useStore((s) => s.approvePO);
   const rejectPO = useStore((s) => s.rejectPO);
+
+  const [revDate, setRevDate] = useState<string>(todayKey());
+  const [revAmount, setRevAmount] = useState('');
+  const [revNotes, setRevNotes] = useState('');
+  const [revError, setRevError] = useState<string | null>(null);
 
   const reorderAlertsCount = useMemo(() => {
     if (!lastReorderPrediction) return 0;
@@ -102,6 +113,88 @@ export default function OwnerPage() {
     return count;
   }, [priceHistory]);
 
+  // Monday-start week key: returns YYYY-MM-DD for the Monday of the given date.
+  const weekKeyFor = (d: Date): string => {
+    const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const day = x.getDay(); // 0 = Sun, 1 = Mon, ...
+    const offset = day === 0 ? -6 : 1 - day; // shift back to Monday
+    x.setDate(x.getDate() + offset);
+    return x.toISOString().slice(0, 10);
+  };
+
+  const thisWeekStart = useMemo(() => weekKeyFor(new Date()), []);
+
+  const weeklyRevenueSeries = useMemo(() => {
+    // Last 12 weeks, Monday-start, in chronological order.
+    const buckets: { key: string; label: string; value: number }[] = [];
+    const today = new Date();
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i * 7);
+      const key = weekKeyFor(d);
+      const label = new Date(key).toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+      });
+      buckets.push({ key, label, value: 0 });
+    }
+    const indexByKey = new Map(buckets.map((b, i) => [b.key, i]));
+    for (const r of revenue) {
+      const wk = weekKeyFor(new Date(r.date));
+      const idx = indexByKey.get(wk);
+      if (idx !== undefined) buckets[idx].value += r.amount;
+    }
+    return buckets;
+  }, [revenue]);
+
+  const thisWeekRevenue = useMemo(
+    () =>
+      revenue
+        .filter((r) => weekKeyFor(new Date(r.date)) === thisWeekStart)
+        .reduce((s, r) => s + r.amount, 0),
+    [revenue, thisWeekStart]
+  );
+
+  const thisWeekExpenses = useMemo(
+    () =>
+      expenses
+        .filter((e) => weekKeyFor(new Date(e.date)) === thisWeekStart)
+        .reduce((s, e) => s + e.amount, 0),
+    [expenses, thisWeekStart]
+  );
+
+  const thisWeekDelta = thisWeekRevenue - thisWeekExpenses;
+
+  const submitRevenue = (e: React.FormEvent) => {
+    e.preventDefault();
+    setRevError(null);
+    const amt = Number(revAmount);
+    if (!revDate) {
+      setRevError('Pick a date.');
+      return;
+    }
+    if (!amt || amt <= 0) {
+      setRevError('Amount must be a positive number.');
+      return;
+    }
+    addRevenue({
+      date: revDate,
+      amount: amt,
+      notes: revNotes.trim() || undefined,
+      source: 'manual',
+    });
+    setRevAmount('');
+    setRevNotes('');
+  };
+
+  const recentRevenueEntries = useMemo(
+    () =>
+      [...revenue]
+        .sort((a, b) => (a.date < b.date ? 1 : -1))
+        .slice(0, 5),
+    [revenue]
+  );
+
   const recentActivity = useMemo(() => {
     const items: { id: string; when: string; text: string }[] = [];
     pos.slice(-5).forEach((p) =>
@@ -128,11 +221,11 @@ export default function OwnerPage() {
   return (
     <div className="space-y-6">
       <header>
-        <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+        <div className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
           {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
         </div>
-        <h1 className="text-2xl font-semibold text-slate-900">Good morning, Boss</h1>
-        <p className="text-sm text-slate-600">Here’s the brief for today.</p>
+        <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Good morning, Boss</h1>
+        <p className="text-sm text-slate-600 dark:text-slate-400">Here’s the brief for today.</p>
       </header>
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -194,22 +287,29 @@ export default function OwnerPage() {
             }
           />
         </Link>
+        <KpiCard
+          label="Revenue vs Expenses (week)"
+          value={`${thisWeekDelta >= 0 ? '+' : '-'}${formatINR(Math.abs(thisWeekDelta))}`}
+          icon={Wallet}
+          tone={thisWeekDelta >= 0 ? 'success' : 'danger'}
+          hint={`Revenue ${formatINR(thisWeekRevenue)} − Expenses ${formatINR(thisWeekExpenses)}`}
+        />
       </section>
 
       <section className="card p-5">
         <div className="mb-3 flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900">Pending PO approvals</h2>
-            <p className="text-xs text-slate-500">Purchase orders above ₹10,000 require your sign-off.</p>
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Pending PO approvals</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Purchase orders above ₹10,000 require your sign-off.</p>
           </div>
         </div>
         {pendingPOs.length === 0 ? (
-          <div className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500">No POs awaiting approval.</div>
+          <div className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500 dark:bg-slate-900/50 dark:text-slate-400">No POs awaiting approval.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-slate-200">
+                <tr className="border-b border-slate-200 dark:border-slate-800">
                   <th className="table-th">PO</th>
                   <th className="table-th">Vendor</th>
                   <th className="table-th">Items</th>
@@ -218,7 +318,7 @@ export default function OwnerPage() {
                   <th className="table-th text-right">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {pendingPOs.map((po) => {
                   const vendor = vendors.find((v) => v.id === po.vendorId);
                   return (
@@ -229,7 +329,7 @@ export default function OwnerPage() {
                         {po.items.map((it) => `${it.quantity} ${it.unit} ${it.itemName}`).join(', ')}
                       </td>
                       <td className="table-td font-semibold">{formatINR(po.totalValue)}</td>
-                      <td className="table-td text-xs text-slate-500">{formatDateTime(po.raisedAt)}</td>
+                      <td className="table-td text-xs text-slate-500 dark:text-slate-400">{formatDateTime(po.raisedAt)}</td>
                       <td className="table-td text-right">
                         <div className="inline-flex gap-2">
                           <button
@@ -254,21 +354,21 @@ export default function OwnerPage() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="card p-5">
-          <h2 className="text-lg font-semibold text-slate-900">Today’s chef journal</h2>
-          <p className="text-xs text-slate-500">Prep, batch, marination & wastage from the kitchen.</p>
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Today’s chef journal</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Prep, batch, marination & wastage from the kitchen.</p>
           <ul className="mt-3 space-y-2">
             {todaysJournal.length === 0 ? (
-              <li className="rounded-lg bg-slate-50 p-3 text-sm text-slate-500">Nothing logged yet today.</li>
+              <li className="rounded-lg bg-slate-50 p-3 text-sm text-slate-500 dark:bg-slate-900/50 dark:text-slate-400">Nothing logged yet today.</li>
             ) : (
               todaysJournal.map((j) => (
-                <li key={j.id} className="rounded-lg border border-slate-200 p-3 text-sm">
+                <li key={j.id} className="rounded-lg border border-slate-200 p-3 text-sm dark:border-slate-800">
                   <div className="flex items-center justify-between">
                     <StatusBadge status={j.type} />
-                    <span className="text-xs text-slate-500">{formatDateTime(j.timestamp)}</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400">{formatDateTime(j.timestamp)}</span>
                   </div>
-                  <div className="mt-1 text-slate-700">{j.description}</div>
+                  <div className="mt-1 text-slate-700 dark:text-slate-200">{j.description}</div>
                   {j.itemName ? (
-                    <div className="mt-0.5 text-xs text-slate-500">
+                    <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                       {j.itemName} {j.quantity ? `· ${j.quantity}` : null}
                     </div>
                   ) : null}
@@ -280,13 +380,13 @@ export default function OwnerPage() {
 
         <section className="card p-5">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-slate-900">Document expiry alerts</h2>
-            <FileWarning className="h-4 w-4 text-amber-600" />
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Document expiry alerts</h2>
+            <FileWarning className="h-4 w-4 text-amber-600 dark:text-amber-300" />
           </div>
-          <p className="text-xs text-slate-500">Anything expiring in the next 30 days.</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Anything expiring in the next 30 days.</p>
           <ul className="mt-3 space-y-2">
             {expiring.length === 0 ? (
-              <li className="rounded-lg bg-slate-50 p-3 text-sm text-slate-500">All documents healthy.</li>
+              <li className="rounded-lg bg-slate-50 p-3 text-sm text-slate-500 dark:bg-slate-900/50 dark:text-slate-400">All documents healthy.</li>
             ) : (
               expiring.map((d) => {
                 const days = daysUntil(d.expiryDate);
@@ -302,8 +402,8 @@ export default function OwnerPage() {
                     }
                   >
                     <div>
-                      <div className="font-medium text-slate-900">{d.name}</div>
-                      <div className="text-xs text-slate-600">{d.category}</div>
+                      <div className="font-medium text-slate-900 dark:text-slate-100">{d.name}</div>
+                      <div className="text-xs text-slate-600 dark:text-slate-400">{d.category}</div>
                     </div>
                     <div className="text-right text-xs">
                       <div className="font-medium">
@@ -322,15 +422,134 @@ export default function OwnerPage() {
       </div>
 
       <section className="card p-5">
-        <div className="flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4 text-amber-600" />
-          <h2 className="text-lg font-semibold text-slate-900">Recent activity</h2>
+        <div className="mb-3 flex items-center gap-2">
+          <Wallet className="h-4 w-4 text-emerald-600 dark:text-emerald-300" />
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+            Revenue
+          </h2>
+          <span className="text-xs text-slate-500 dark:text-slate-400">
+            Manual entry — POS integration coming later
+          </span>
         </div>
-        <ul className="mt-3 divide-y divide-slate-100 text-sm">
+        {revError ? (
+          <div className="mb-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-sm text-rose-700 dark:border-rose-800 dark:bg-rose-900/30 dark:text-rose-200">
+            {revError}
+          </div>
+        ) : null}
+        <form
+          onSubmit={submitRevenue}
+          className="grid gap-3 sm:grid-cols-5 items-end"
+        >
+          <div>
+            <label className="label">Date</label>
+            <input
+              type="date"
+              className="input"
+              value={revDate}
+              onChange={(e) => setRevDate(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="label">Amount (₹)</label>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              className="input"
+              value={revAmount}
+              onChange={(e) => setRevAmount(e.target.value)}
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="label">Notes (optional)</label>
+            <input
+              className="input"
+              value={revNotes}
+              onChange={(e) => setRevNotes(e.target.value)}
+              placeholder="Dine-in, takeaway split, event..."
+            />
+          </div>
+          <div>
+            <button type="submit" className="btn btn-primary w-full">
+              Add revenue
+            </button>
+          </div>
+        </form>
+
+        <div className="mt-5">
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+              Last 12 weeks
+            </h3>
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              Mon-Sun totals
+            </span>
+          </div>
+          {revenue.length === 0 ? (
+            <div className="rounded-lg bg-slate-50 p-4 text-center text-sm text-slate-500 dark:bg-slate-900/50 dark:text-slate-400">
+              No revenue logged yet. Add entries above to see the trend.
+            </div>
+          ) : (
+            <LineChart
+              data={weeklyRevenueSeries.map((b) => ({
+                label: b.label,
+                value: b.value,
+              }))}
+              yLabel="₹"
+              color="#10b981"
+              height={200}
+            />
+          )}
+        </div>
+
+        {recentRevenueEntries.length > 0 ? (
+          <div className="mt-4">
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+              Recent entries
+            </h3>
+            <ul className="mt-2 divide-y divide-slate-100 text-sm dark:divide-slate-800">
+              {recentRevenueEntries.map((r) => (
+                <li
+                  key={r.id}
+                  className="flex items-center justify-between py-2"
+                >
+                  <div>
+                    <div className="font-medium text-slate-900 dark:text-slate-100">
+                      {formatINR(r.amount)}{' '}
+                      <span className="text-xs text-slate-500 dark:text-slate-400">
+                        · {formatDate(r.date)}
+                      </span>
+                    </div>
+                    {r.notes ? (
+                      <div className="text-xs text-slate-500 dark:text-slate-400">
+                        {r.notes}
+                      </div>
+                    ) : null}
+                  </div>
+                  <button
+                    onClick={() => deleteRevenue(r.id)}
+                    className="inline-flex items-center gap-1 text-xs text-rose-600 hover:underline dark:text-rose-400"
+                    title="Delete entry"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" /> Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+      </section>
+
+      <section className="card p-5">
+        <div className="flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-300" />
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Recent activity</h2>
+        </div>
+        <ul className="mt-3 divide-y divide-slate-100 text-sm dark:divide-slate-800">
           {recentActivity.map((a) => (
             <li key={a.id} className="flex items-center justify-between py-2">
-              <span className="text-slate-700">{a.text}</span>
-              <span className="text-xs text-slate-500">{formatDateTime(a.when)}</span>
+              <span className="text-slate-700 dark:text-slate-200">{a.text}</span>
+              <span className="text-xs text-slate-500 dark:text-slate-400">{formatDateTime(a.when)}</span>
             </li>
           ))}
         </ul>

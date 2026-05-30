@@ -25,6 +25,11 @@ import type {
   QuoteAnalysisResult,
   ReorderPredictionResult,
   ReorderPredictionBundle,
+  Recipe,
+  CostVarianceReport,
+  ExpenseCategoryCorrection,
+  RevenueEntry,
+  ThemePreference,
 } from './types';
 import {
   seedInventory,
@@ -77,6 +82,13 @@ interface AppState {
     generatedAt: string;
     result: ReorderPredictionResult;
   };
+
+  // Phase 3 — recipes, cost variance, expense corrections, revenue, theme
+  recipes: Recipe[];
+  lastCostVarianceReport?: CostVarianceReport;
+  expenseCategoryCorrections: ExpenseCategoryCorrection[];
+  revenue: RevenueEntry[];
+  theme: ThemePreference;
 
   setRole: (r: Role | null) => void;
 
@@ -147,6 +159,29 @@ interface AppState {
 
   getReorderInputBundle: () => ReorderPredictionBundle;
   setReorderPrediction: (result: ReorderPredictionResult) => void;
+
+  // Phase 3 — recipes
+  addRecipe: (r: Omit<Recipe, 'id' | 'createdAt'>) => string;
+  updateRecipe: (id: string, patch: Partial<Omit<Recipe, 'id' | 'createdAt'>>) => void;
+  deleteRecipe: (id: string) => void;
+  setCostVarianceReport: (report: CostVarianceReport) => void;
+
+  // Phase 3 — documents
+  renewDocument: (id: string, newExpiry: string, fileId?: string) => Promise<void>;
+
+  // Phase 3 — expense category corrections
+  updateExpenseCategory: (id: string, newCategory: string) => void;
+  recordExpenseCategoryCorrection: (
+    correction: Omit<ExpenseCategoryCorrection, 'id' | 'correctedAt'>
+  ) => void;
+  suggestExpenseCategory: (vendor: string, notes: string) => string | null;
+
+  // Phase 3 — revenue
+  addRevenue: (r: Omit<RevenueEntry, 'id'>) => string;
+  deleteRevenue: (id: string) => void;
+
+  // Phase 3 — theme
+  setTheme: (theme: ThemePreference) => void;
 }
 
 export const useStore = create<AppState>()(
@@ -167,6 +202,11 @@ export const useStore = create<AppState>()(
       stockAdjustments: [],
       vendorReliability: [],
       lastReorderPrediction: undefined,
+      recipes: [],
+      lastCostVarianceReport: undefined,
+      expenseCategoryCorrections: [],
+      revenue: [],
+      theme: 'system',
 
       setRole: (role) => set({ role }),
 
@@ -818,10 +858,109 @@ export const useStore = create<AppState>()(
             result,
           },
         }),
+
+      // ----- Recipes --------------------------------------------------------
+      addRecipe: (r) => {
+        const newId = id('rcp');
+        set((s) => ({
+          recipes: [
+            ...s.recipes,
+            { ...r, id: newId, createdAt: new Date().toISOString() },
+          ],
+        }));
+        return newId;
+      },
+
+      updateRecipe: (rid, patch) =>
+        set((s) => ({
+          recipes: s.recipes.map((r) => (r.id === rid ? { ...r, ...patch } : r)),
+        })),
+
+      deleteRecipe: (rid) =>
+        set((s) => ({ recipes: s.recipes.filter((r) => r.id !== rid) })),
+
+      setCostVarianceReport: (report) => set({ lastCostVarianceReport: report }),
+
+      // ----- Documents ------------------------------------------------------
+      renewDocument: async (docId, newExpiry, newFileId) => {
+        const target = useStore.getState().documents.find((d) => d.id === docId);
+        const oldFileId = target?.fileId;
+        set((s) => ({
+          documents: s.documents.map((d) =>
+            d.id === docId
+              ? {
+                  ...d,
+                  expiryDate: newExpiry,
+                  renewedAt: new Date().toISOString(),
+                  fileId: newFileId ?? d.fileId,
+                }
+              : d
+          ),
+        }));
+        if (newFileId && oldFileId && oldFileId !== newFileId) {
+          try {
+            await deleteFile(oldFileId);
+          } catch {
+            // Stale file — non-fatal.
+          }
+        }
+      },
+
+      // ----- Expense category corrections -----------------------------------
+      updateExpenseCategory: (eid, newCategory) =>
+        set((s) => ({
+          expenses: s.expenses.map((e) =>
+            e.id === eid ? { ...e, category: newCategory } : e
+          ),
+        })),
+
+      recordExpenseCategoryCorrection: (correction) => {
+        const entry: ExpenseCategoryCorrection = {
+          ...correction,
+          id: id('ecc'),
+          correctedAt: new Date().toISOString(),
+        };
+        set((s) => ({
+          expenseCategoryCorrections: [entry, ...s.expenseCategoryCorrections],
+        }));
+      },
+
+      suggestExpenseCategory: (vendor, notes) => {
+        const v = vendor.trim().toLowerCase();
+        const tokens = tokenizeForCategoryMatch(notes);
+        const corrections = get().expenseCategoryCorrections;
+        // Score: vendor exact match = 3, keyword overlap count = +1 each.
+        let best: { score: number; category: string } | null = null;
+        for (const c of corrections) {
+          let score = 0;
+          if (v && c.vendorName && c.vendorName.toLowerCase() === v) score += 3;
+          const overlap = c.descriptionKeywords.filter((k) =>
+            tokens.includes(k)
+          ).length;
+          score += overlap;
+          if (score > 0 && (!best || score > best.score)) {
+            best = { score, category: c.correctedCategory };
+          }
+        }
+        return best ? best.category : null;
+      },
+
+      // ----- Revenue --------------------------------------------------------
+      addRevenue: (r) => {
+        const newId = id('rev');
+        set((s) => ({ revenue: [{ ...r, id: newId }, ...s.revenue] }));
+        return newId;
+      },
+
+      deleteRevenue: (rid) =>
+        set((s) => ({ revenue: s.revenue.filter((r) => r.id !== rid) })),
+
+      // ----- Theme ----------------------------------------------------------
+      setTheme: (theme) => set({ theme }),
     }),
     {
       name: 'restaurant-os-store',
-      version: 6,
+      version: 7,
       migrate: (persisted, version) => {
         const state =
           persisted && typeof persisted === 'object'
@@ -860,11 +999,69 @@ export const useStore = create<AppState>()(
             state.lastReorderPrediction = undefined;
           }
         }
+        // v7: NON-destructive — Phase 3 collections + theme preference.
+        if (version < 7) {
+          if (!Array.isArray(state.recipes)) state.recipes = [];
+          if (!('lastCostVarianceReport' in state)) {
+            state.lastCostVarianceReport = undefined;
+          }
+          if (!Array.isArray(state.expenseCategoryCorrections)) {
+            state.expenseCategoryCorrections = [];
+          }
+          if (!Array.isArray(state.revenue)) state.revenue = [];
+          if (typeof state.theme !== 'string') state.theme = 'system';
+        }
         return state as unknown as AppState;
       },
     }
   )
 );
+
+// Stopwords filtered out before tokenizing expense notes for fuzzy matches.
+const EXPENSE_STOPWORDS = new Set([
+  'the',
+  'a',
+  'an',
+  'and',
+  'or',
+  'for',
+  'of',
+  'to',
+  'on',
+  'in',
+  'at',
+  'with',
+  'from',
+  'by',
+  'is',
+  'was',
+  'this',
+  'that',
+  'paid',
+  'bill',
+  'invoice',
+  'expense',
+  'amount',
+  'rs',
+  'inr',
+]);
+
+/**
+ * Lower-case, strip punctuation, drop short/stop-words. Used for fuzzy
+ * matching expense corrections without pulling in an NLP dependency.
+ */
+export function tokenizeForCategoryMatch(text: string): string[] {
+  if (!text) return [];
+  return Array.from(
+    new Set(
+      text
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .split(/\s+/)
+        .filter((t) => t.length >= 3 && !EXPENSE_STOPWORDS.has(t))
+    )
+  );
+}
 
 export type POLineItemForm = POLineItem;
 

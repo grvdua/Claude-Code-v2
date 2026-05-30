@@ -39,24 +39,24 @@ export default function ProcurementPage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold text-slate-900">Procurement pipeline</h1>
-        <p className="text-sm text-slate-600">
+        <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Procurement pipeline</h1>
+        <p className="text-sm text-slate-600 dark:text-slate-300">
           Visibility from material request all the way through Goods Received Note.
         </p>
       </header>
 
       <section className="space-y-4">
         {merged.length === 0 ? (
-          <div className="card p-5 text-sm text-slate-500">No procurement activity yet.</div>
+          <div className="card p-5 text-sm text-slate-500 dark:text-slate-400">No procurement activity yet.</div>
         ) : (
           merged.map(({ request, quotes, pos, stage }) => (
             <article key={request.id} className="card p-5">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <div className="font-medium text-slate-900">
+                  <div className="font-medium text-slate-900 dark:text-slate-100">
                     {request.quantity} {request.unit} · {request.itemName}
                   </div>
-                  <div className="text-xs text-slate-500">
+                  <div className="text-xs text-slate-500 dark:text-slate-400">
                     Raised by {request.raisedBy} · {formatDateTime(request.raisedAt)}
                   </div>
                 </div>
@@ -74,7 +74,7 @@ export default function ProcurementPage() {
                         'rounded-full px-2.5 py-1 font-medium ring-1 ' +
                         (idx <= stage
                           ? 'bg-brand-50 text-brand-700 ring-brand-200'
-                          : 'bg-slate-50 text-slate-400 ring-slate-200')
+                          : 'bg-slate-50 dark:bg-slate-900/50 text-slate-400 dark:text-slate-500 ring-slate-200 dark:ring-slate-800')
                       }
                     >
                       {label}
@@ -88,19 +88,19 @@ export default function ProcurementPage() {
 
               {quotes.length > 0 ? (
                 <div className="mt-4">
-                  <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                     Quotes ({quotes.length})
                   </div>
                   <ul className="grid gap-2 sm:grid-cols-2">
                     {quotes.map((q) => {
                       const v = vendors.find((vv) => vv.id === q.vendorId);
                       return (
-                        <li key={q.id} className="rounded-lg border border-slate-200 p-2 text-xs">
+                        <li key={q.id} className="rounded-lg border border-slate-200 dark:border-slate-800 p-2 text-xs">
                           <div className="flex items-center justify-between">
-                            <span className="font-medium text-slate-900">{v?.name ?? q.vendorId}</span>
+                            <span className="font-medium text-slate-900 dark:text-slate-100">{v?.name ?? q.vendorId}</span>
                             <span className="font-semibold">{formatINR(q.totalPrice)}</span>
                           </div>
-                          <div className="text-slate-500">{formatINR(q.pricePerUnit)} / unit</div>
+                          <div className="text-slate-500 dark:text-slate-400">{formatINR(q.pricePerUnit)} / unit</div>
                         </li>
                       );
                     })}
@@ -110,20 +110,20 @@ export default function ProcurementPage() {
 
               {pos.length > 0 ? (
                 <div className="mt-4">
-                  <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                     Purchase Orders
                   </div>
                   <ul className="space-y-2">
                     {pos.map((p) => {
                       const v = vendors.find((vv) => vv.id === p.vendorId);
                       return (
-                        <li key={p.id} className="rounded-lg border border-slate-200 p-2 text-xs">
+                        <li key={p.id} className="rounded-lg border border-slate-200 dark:border-slate-800 p-2 text-xs">
                           <div className="flex items-center justify-between">
                             <span className="font-mono">{p.id}</span>
                             <StatusBadge status={p.status} />
                           </div>
                           <div className="mt-1 flex items-center justify-between">
-                            <span className="text-slate-600">{v?.name ?? p.vendorId}</span>
+                            <span className="text-slate-600 dark:text-slate-300">{v?.name ?? p.vendorId}</span>
                             <span className="font-semibold">{formatINR(p.totalValue)}</span>
                           </div>
                         </li>

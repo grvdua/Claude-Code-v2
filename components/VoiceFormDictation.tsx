@@ -156,7 +156,7 @@ export function VoiceFormDictation<T>({
   };
 
   return (
-    <div className={clsx('rounded-lg border border-slate-200 bg-slate-50 p-2', className)}>
+    <div className={clsx('rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 p-2', className)}>
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
@@ -165,7 +165,7 @@ export function VoiceFormDictation<T>({
             'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium ring-1 transition',
             listening
               ? 'bg-rose-50 text-rose-700 ring-rose-200 animate-pulse'
-              : 'bg-white text-brand-700 ring-brand-200 hover:bg-brand-50'
+              : 'bg-white dark:bg-slate-900 text-brand-700 ring-brand-200 hover:bg-brand-50'
           )}
         >
           <Mic className="h-3.5 w-3.5" />
@@ -193,14 +193,14 @@ export function VoiceFormDictation<T>({
               setTranscript('');
               finalTextRef.current = '';
             }}
-            className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700"
+            className="inline-flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200"
           >
             <X className="h-3 w-3" /> clear
           </button>
         ) : null}
       </div>
       {transcript ? (
-        <div className="mt-2 rounded bg-white p-2 text-xs text-slate-700 ring-1 ring-slate-100">
+        <div className="mt-2 rounded bg-white dark:bg-slate-900 p-2 text-xs text-slate-700 dark:text-slate-200 ring-1 ring-slate-100">
           {transcript}
         </div>
       ) : null}

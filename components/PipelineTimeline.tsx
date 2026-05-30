@@ -137,8 +137,8 @@ export function PipelineTimeline({
                     done
                       ? 'bg-emerald-500 text-white ring-emerald-500'
                       : isActive
-                      ? 'bg-white text-emerald-700 ring-emerald-500 ring-offset-2 ring-offset-white'
-                      : 'bg-white text-slate-400 ring-slate-300'
+                      ? 'bg-white dark:bg-slate-900 text-emerald-700 ring-emerald-500 ring-offset-2 ring-offset-white'
+                      : 'bg-white dark:bg-slate-900 text-slate-400 dark:text-slate-500 ring-slate-300'
                   )}
                   aria-current={isActive ? 'step' : undefined}
                 >
@@ -166,13 +166,13 @@ export function PipelineTimeline({
                     ? 'text-emerald-700'
                     : isActive
                     ? 'text-emerald-700'
-                    : 'text-slate-500'
+                    : 'text-slate-500 dark:text-slate-400'
                 )}
               >
                 {s.label}
               </div>
               {s.timestamp ? (
-                <div className="text-[10px] text-slate-400">
+                <div className="text-[10px] text-slate-400 dark:text-slate-500">
                   {formatDateTime(s.timestamp)}
                 </div>
               ) : (
@@ -196,8 +196,8 @@ export function PipelineTimeline({
                   done
                     ? 'bg-emerald-500 text-white ring-emerald-500'
                     : isActive
-                    ? 'bg-white text-emerald-700 ring-emerald-500'
-                    : 'bg-white text-slate-400 ring-slate-300'
+                    ? 'bg-white dark:bg-slate-900 text-emerald-700 ring-emerald-500'
+                    : 'bg-white dark:bg-slate-900 text-slate-400 dark:text-slate-500 ring-slate-300'
                 )}
               >
                 {done ? (
@@ -210,13 +210,13 @@ export function PipelineTimeline({
                 <div
                   className={clsx(
                     'text-xs font-medium',
-                    done || isActive ? 'text-slate-900' : 'text-slate-500'
+                    done || isActive ? 'text-slate-900 dark:text-slate-100' : 'text-slate-500 dark:text-slate-400'
                   )}
                 >
                   {s.label}
                 </div>
                 {s.timestamp ? (
-                  <div className="text-[10px] text-slate-400">
+                  <div className="text-[10px] text-slate-400 dark:text-slate-500">
                     {formatDateTime(s.timestamp)}
                   </div>
                 ) : null}

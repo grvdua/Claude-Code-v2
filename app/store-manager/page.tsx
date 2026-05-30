@@ -409,15 +409,15 @@ export default function StoreManagerPage() {
           <Warehouse className="h-5 w-5" />
         </span>
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Store Dashboard</h1>
-          <p className="text-sm text-slate-600">
+          <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Store Dashboard</h1>
+          <p className="text-sm text-slate-600 dark:text-slate-300">
             Process chef requests, issue RFQs, raise POs, and log deliveries.
           </p>
         </div>
       </header>
 
       {/* Tabs */}
-      <nav className="flex flex-wrap gap-1 border-b border-slate-200">
+      <nav className="flex flex-wrap gap-1 border-b border-slate-200 dark:border-slate-800">
         {(
           [
             ['pipeline', 'Procurement pipeline'],
@@ -433,7 +433,7 @@ export default function StoreManagerPage() {
               '-mb-px border-b-2 px-3 py-2 text-sm font-medium transition',
               tab === k
                 ? 'border-brand-600 text-brand-700'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
+                : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100'
             )}
           >
             {label}
@@ -444,27 +444,27 @@ export default function StoreManagerPage() {
       {tab === 'pipeline' ? (
         <>
           <section className="card p-5">
-            <h2 className="text-lg font-semibold text-slate-900">
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
               Inbox — chef requests
             </h2>
             {inbox.length === 0 ? (
-              <div className="mt-3 rounded-lg bg-slate-50 p-4 text-sm text-slate-500">
+              <div className="mt-3 rounded-lg bg-slate-50 dark:bg-slate-900/50 p-4 text-sm text-slate-500 dark:text-slate-400">
                 No new requests.
               </div>
             ) : (
               <ul className="mt-3 space-y-2">
                 {inbox.map((r) => (
-                  <li key={r.id} className="rounded-lg border border-slate-200 p-3">
+                  <li key={r.id} className="rounded-lg border border-slate-200 dark:border-slate-800 p-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
-                        <div className="font-medium text-slate-900">
+                        <div className="font-medium text-slate-900 dark:text-slate-100">
                           {r.quantity} {r.unit} · {r.itemName}
                         </div>
-                        <div className="text-xs text-slate-500">
+                        <div className="text-xs text-slate-500 dark:text-slate-400">
                           Raised by {r.raisedBy} · {formatDateTime(r.raisedAt)}
                         </div>
                         {r.notes ? (
-                          <div className="mt-1 text-xs text-slate-600">{r.notes}</div>
+                          <div className="mt-1 text-xs text-slate-600 dark:text-slate-300">{r.notes}</div>
                         ) : null}
                       </div>
                       <div className="flex items-center gap-2">
@@ -490,8 +490,8 @@ export default function StoreManagerPage() {
                     </div>
 
                     {inventoryFor?.id === r.id ? (
-                      <div className="mt-3 rounded-lg bg-slate-50 p-3 text-sm">
-                        <div className="mb-1 font-medium text-slate-800">
+                      <div className="mt-3 rounded-lg bg-slate-50 dark:bg-slate-900/50 p-3 text-sm">
+                        <div className="mb-1 font-medium text-slate-800 dark:text-slate-100">
                           Stock for "{r.itemName}"
                         </div>
                         {stockFor(r.itemName).length === 0 ? (
@@ -507,10 +507,10 @@ export default function StoreManagerPage() {
                                   key={s.id}
                                   className="flex items-center justify-between"
                                 >
-                                  <span className="capitalize text-slate-700">
+                                  <span className="capitalize text-slate-700 dark:text-slate-200">
                                     {s.location.replace('-', ' ')}
                                   </span>
-                                  <span className="text-slate-900">
+                                  <span className="text-slate-900 dark:text-slate-100">
                                     {s.quantity} {s.unit}{' '}
                                     {deficit > 0 ? (
                                       <span className="ml-2 text-xs text-rose-600">
@@ -528,7 +528,7 @@ export default function StoreManagerPage() {
                           </ul>
                         )}
                         <button
-                          className="mt-2 text-xs text-slate-500 underline"
+                          className="mt-2 text-xs text-slate-500 dark:text-slate-400 underline"
                           onClick={() => setInventoryFor(null)}
                         >
                           Close
@@ -543,15 +543,15 @@ export default function StoreManagerPage() {
 
           {rfqFor ? (
             <section className="card border border-brand-300 p-5">
-              <h2 className="text-lg font-semibold text-slate-900">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
                 Raise RFQ — {rfqFor.quantity} {rfqFor.unit} {rfqFor.itemName}
               </h2>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 Pick vendors to request quotes from.
               </p>
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
                 {vendors.length === 0 ? (
-                  <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-500 sm:col-span-2">
+                  <div className="rounded-lg bg-slate-50 dark:bg-slate-900/50 p-3 text-sm text-slate-500 dark:text-slate-400 sm:col-span-2">
                     No vendors yet. Add some from the owner page, or upload an
                     invoice to auto-create one.
                   </div>
@@ -559,7 +559,7 @@ export default function StoreManagerPage() {
                   vendors.map((v) => (
                     <label
                       key={v.id}
-                      className="flex items-center gap-2 rounded-lg border border-slate-200 p-2 text-sm"
+                      className="flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-800 p-2 text-sm"
                     >
                       <input
                         type="checkbox"
@@ -573,8 +573,8 @@ export default function StoreManagerPage() {
                         }}
                       />
                       <div className="flex-1">
-                        <div className="font-medium text-slate-900">{v.name}</div>
-                        <div className="text-xs text-slate-500">
+                        <div className="font-medium text-slate-900 dark:text-slate-100">{v.name}</div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400">
                           {v.category} · rating {v.rating}
                         </div>
                       </div>
@@ -600,10 +600,10 @@ export default function StoreManagerPage() {
           {/* Procurement pipeline */}
           <section className="card p-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-lg font-semibold text-slate-900">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
                 Procurement pipeline
               </h2>
-              <div className="text-xs text-slate-500">
+              <div className="text-xs text-slate-500 dark:text-slate-400">
                 Sort by:{' '}
                 <SortButton
                   active={reqSort.key === 'urgency'}
@@ -629,7 +629,7 @@ export default function StoreManagerPage() {
               </div>
             </div>
             {sortedOpenRequests.length === 0 ? (
-              <div className="mt-3 rounded-lg bg-slate-50 p-4 text-sm text-slate-500">
+              <div className="mt-3 rounded-lg bg-slate-50 dark:bg-slate-900/50 p-4 text-sm text-slate-500 dark:text-slate-400">
                 Pipeline is clear — no open procurement requests.
               </div>
             ) : (
@@ -637,14 +637,14 @@ export default function StoreManagerPage() {
                 {sortedOpenRequests.map((r) => (
                   <li
                     key={r.id}
-                    className="rounded-lg border border-slate-200 bg-white p-3"
+                    className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3"
                   >
                     <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                       <div>
-                        <div className="font-medium text-slate-900">
+                        <div className="font-medium text-slate-900 dark:text-slate-100">
                           {r.quantity} {r.unit} · {r.itemName}
                         </div>
-                        <div className="text-xs text-slate-500">
+                        <div className="text-xs text-slate-500 dark:text-slate-400">
                           Raised by {r.raisedBy} · {formatDateTime(r.raisedAt)}
                         </div>
                       </div>
@@ -670,10 +670,10 @@ export default function StoreManagerPage() {
         <section className="card p-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h2 className="text-lg font-semibold text-slate-900">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
                 Vendors & Quotes
               </h2>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 Compare incoming quotes, run AI analysis, and raise POs.
               </p>
             </div>
@@ -686,7 +686,7 @@ export default function StoreManagerPage() {
           ) : null}
 
           {requestsAwaitingPO.length === 0 ? (
-            <div className="mt-3 rounded-lg bg-slate-50 p-4 text-sm text-slate-500">
+            <div className="mt-3 rounded-lg bg-slate-50 dark:bg-slate-900/50 p-4 text-sm text-slate-500 dark:text-slate-400">
               No quotes pending review.
             </div>
           ) : (
@@ -711,11 +711,11 @@ export default function StoreManagerPage() {
                 return (
                   <div
                     key={r.id}
-                    className="rounded-lg border border-slate-200 p-3"
+                    className="rounded-lg border border-slate-200 dark:border-slate-800 p-3"
                   >
                     <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-3">
-                        <div className="font-medium text-slate-900">
+                        <div className="font-medium text-slate-900 dark:text-slate-100">
                           {r.quantity} {r.unit} · {r.itemName}
                         </div>
                         <StatusBadge status={r.status} />
@@ -759,7 +759,7 @@ export default function StoreManagerPage() {
                     ) : null}
 
                     {qs.length === 0 ? (
-                      <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-500">
+                      <div className="rounded-lg bg-slate-50 dark:bg-slate-900/50 p-3 text-sm text-slate-500 dark:text-slate-400">
                         No quotes yet. Upload a vendor quote to begin.
                       </div>
                     ) : (
@@ -767,7 +767,7 @@ export default function StoreManagerPage() {
                         <div className="overflow-x-auto">
                           <table className="w-full">
                             <thead>
-                              <tr className="border-b border-slate-100">
+                              <tr className="border-b border-slate-100 dark:border-slate-800">
                                 <th className="table-th">Vendor</th>
                                 <th className="table-th">Reliability</th>
                                 <th className="table-th">
@@ -809,7 +809,7 @@ export default function StoreManagerPage() {
                                 <th className="table-th text-right">Actions</th>
                               </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100">
+                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                               {sortedQs.map((q) => {
                                 const v = vendorById(q.vendorId);
                                 const trend = reliabilityTrendValues(q.vendorId);
@@ -826,7 +826,7 @@ export default function StoreManagerPage() {
                                       )}
                                     >
                                       <td className="table-td">
-                                        <div className="font-medium text-slate-900">
+                                        <div className="font-medium text-slate-900 dark:text-slate-100">
                                           {v?.name ?? q.vendorId}
                                         </div>
                                         {recommended ? (
@@ -856,7 +856,7 @@ export default function StoreManagerPage() {
                                       <td className="table-td text-xs">
                                         {formatDate(q.deliveryDate)}
                                       </td>
-                                      <td className="table-td text-xs text-slate-600">
+                                      <td className="table-td text-xs text-slate-600 dark:text-slate-300">
                                         {q.notes || '—'}
                                       </td>
                                       <td className="table-td text-right">
@@ -892,16 +892,16 @@ export default function StoreManagerPage() {
                                       <tr key={`${q.id}-ai`}>
                                         <td
                                           colSpan={7}
-                                          className="bg-slate-50 px-3 py-2 text-xs"
+                                          className="bg-slate-50 dark:bg-slate-900/50 px-3 py-2 text-xs"
                                         >
                                           <div className="grid gap-3 sm:grid-cols-2">
                                             <div>
                                               <div className="font-semibold text-emerald-700">
                                                 Pros
                                               </div>
-                                              <ul className="mt-1 list-inside list-disc space-y-0.5 text-slate-700">
+                                              <ul className="mt-1 list-inside list-disc space-y-0.5 text-slate-700 dark:text-slate-200">
                                                 {ai.pros.length === 0 ? (
-                                                  <li className="text-slate-400">—</li>
+                                                  <li className="text-slate-400 dark:text-slate-500">—</li>
                                                 ) : (
                                                   ai.pros.map((p, idx) => (
                                                     <li key={idx}>{p}</li>
@@ -913,9 +913,9 @@ export default function StoreManagerPage() {
                                               <div className="font-semibold text-rose-700">
                                                 Cons
                                               </div>
-                                              <ul className="mt-1 list-inside list-disc space-y-0.5 text-slate-700">
+                                              <ul className="mt-1 list-inside list-disc space-y-0.5 text-slate-700 dark:text-slate-200">
                                                 {ai.cons.length === 0 ? (
-                                                  <li className="text-slate-400">—</li>
+                                                  <li className="text-slate-400 dark:text-slate-500">—</li>
                                                 ) : (
                                                   ai.cons.map((c, idx) => (
                                                     <li key={idx}>{c}</li>
@@ -925,15 +925,15 @@ export default function StoreManagerPage() {
                                             </div>
                                             <div className="sm:col-span-2">
                                               <div className="flex flex-wrap items-center gap-3">
-                                                <span className="rounded bg-white px-2 py-0.5 ring-1 ring-slate-200">
+                                                <span className="rounded bg-white dark:bg-slate-900 px-2 py-0.5 ring-1 ring-slate-200 dark:ring-slate-800">
                                                   Value: <b>{ai.valueScore}</b>
                                                 </span>
-                                                <span className="rounded bg-white px-2 py-0.5 ring-1 ring-slate-200">
+                                                <span className="rounded bg-white dark:bg-slate-900 px-2 py-0.5 ring-1 ring-slate-200 dark:ring-slate-800">
                                                   Reliability:{' '}
                                                   <b>{ai.reliabilityScore}</b>
                                                 </span>
                                               </div>
-                                              <p className="mt-1 text-slate-700">
+                                              <p className="mt-1 text-slate-700 dark:text-slate-200">
                                                 {ai.reasoning}
                                               </p>
                                             </div>
@@ -950,8 +950,8 @@ export default function StoreManagerPage() {
 
                         {/* Side-by-side comparison charts */}
                         <div className="mt-4 grid gap-4 lg:grid-cols-2">
-                          <div className="rounded-lg border border-slate-200 p-3">
-                            <div className="mb-1 text-xs font-medium text-slate-600">
+                          <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3">
+                            <div className="mb-1 text-xs font-medium text-slate-600 dark:text-slate-300">
                               Price per unit (lower is better)
                             </div>
                             <BarChart
@@ -968,8 +968,8 @@ export default function StoreManagerPage() {
                               height={200}
                             />
                           </div>
-                          <div className="rounded-lg border border-slate-200 p-3">
-                            <div className="mb-1 text-xs font-medium text-slate-600">
+                          <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3">
+                            <div className="mb-1 text-xs font-medium text-slate-600 dark:text-slate-300">
                               Vendor reliability (higher is better)
                             </div>
                             <BarChart
@@ -998,16 +998,16 @@ export default function StoreManagerPage() {
 
       {tab === 'pos' ? (
         <section className="card p-5">
-          <h2 className="text-lg font-semibold text-slate-900">Purchase orders</h2>
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Purchase orders</h2>
           {pos.length === 0 ? (
-            <div className="mt-3 rounded-lg bg-slate-50 p-4 text-sm text-slate-500">
+            <div className="mt-3 rounded-lg bg-slate-50 dark:bg-slate-900/50 p-4 text-sm text-slate-500 dark:text-slate-400">
               No purchase orders yet.
             </div>
           ) : (
             <div className="mt-3 overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-slate-200">
+                  <tr className="border-b border-slate-200 dark:border-slate-800">
                     <th className="table-th">PO</th>
                     <th className="table-th">Vendor</th>
                     <th className="table-th">Items</th>
@@ -1017,7 +1017,7 @@ export default function StoreManagerPage() {
                     <th className="table-th text-right">Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {[...pos]
                     .sort((a, b) => (a.raisedAt < b.raisedAt ? 1 : -1))
                     .map((p) => {
@@ -1061,7 +1061,7 @@ export default function StoreManagerPage() {
                             {canTrack ? (
                               p.trackingNumber ? (
                                 <span
-                                  className="inline-flex items-center gap-1 text-slate-700"
+                                  className="inline-flex items-center gap-1 text-slate-700 dark:text-slate-200"
                                   title={p.shipmentNotes ?? ''}
                                 >
                                   <Truck className="h-3 w-3" />
@@ -1104,7 +1104,7 @@ export default function StoreManagerPage() {
                                 </form>
                               )
                             ) : (
-                              <span className="text-slate-400">—</span>
+                              <span className="text-slate-400 dark:text-slate-500">—</span>
                             )}
                           </td>
                           <td className="table-td text-right">
@@ -1116,7 +1116,7 @@ export default function StoreManagerPage() {
                                 <PackageCheck className="h-4 w-4" /> Log GRN
                               </button>
                             ) : (
-                              <span className="text-xs text-slate-400">—</span>
+                              <span className="text-xs text-slate-400 dark:text-slate-500">—</span>
                             )}
                           </td>
                         </tr>
@@ -1162,11 +1162,11 @@ export default function StoreManagerPage() {
       {/* GRN modal */}
       {grnForPO ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-          <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
+          <div className="w-full max-w-md rounded-xl bg-white dark:bg-slate-900 p-5 shadow-xl">
             <div className="flex items-start justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-slate-900">Log GRN</h3>
-                <p className="text-xs text-slate-500">
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Log GRN</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
                   Confirm receipt for{' '}
                   <span className="font-mono">{grnForPO}</span>. Attach the
                   supplier invoice (optional).
@@ -1175,7 +1175,7 @@ export default function StoreManagerPage() {
               <button
                 type="button"
                 onClick={() => setGrnForPO(null)}
-                className="rounded p-1 text-slate-400 hover:bg-slate-100"
+                className="rounded p-1 text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:bg-slate-800"
                 aria-label="Close"
               >
                 <X className="h-4 w-4" />
@@ -1195,10 +1195,10 @@ export default function StoreManagerPage() {
                 onChange={(e) =>
                   handleGrnInvoicePick(e.target.files?.[0] ?? null)
                 }
-                className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-brand-700 hover:file:bg-brand-100"
+                className="block w-full text-sm text-slate-600 dark:text-slate-300 file:mr-3 file:rounded-md file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-brand-700 hover:file:bg-brand-100"
               />
               {grnInvoice ? (
-                <div className="mt-1 text-xs text-slate-500">
+                <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                   {grnInvoice.name} · {formatFileSize(grnInvoice.size)}
                 </div>
               ) : null}
@@ -1285,7 +1285,7 @@ function SortButton({
         'inline-flex items-center gap-0.5 rounded px-1.5 py-0.5',
         active
           ? 'bg-brand-50 text-brand-700 ring-1 ring-brand-200'
-          : 'text-slate-500 hover:bg-slate-100'
+          : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:bg-slate-800'
       )}
     >
       {children}
@@ -1317,7 +1317,7 @@ function SortHeader({
       onClick={onClick}
       className={clsx(
         'inline-flex items-center gap-0.5',
-        active ? 'text-brand-700' : 'text-slate-500'
+        active ? 'text-brand-700' : 'text-slate-500 dark:text-slate-400'
       )}
     >
       {label}
@@ -1508,23 +1508,23 @@ function QuoteUploadModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-xl rounded-xl bg-white shadow-xl"
+        className="w-full max-w-xl rounded-xl bg-white dark:bg-slate-900 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
-          <div className="flex items-center gap-2 text-lg font-semibold text-slate-900">
+        <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 px-5 py-3">
+          <div className="flex items-center gap-2 text-lg font-semibold text-slate-900 dark:text-slate-100">
             <Upload className="h-5 w-5 text-brand-600" /> Upload vendor quote
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full p-1 text-slate-500 hover:bg-slate-100"
+            className="rounded-full p-1 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:bg-slate-800"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
         <div className="space-y-3 p-5">
-          <div className="text-xs text-slate-500">
+          <div className="text-xs text-slate-500 dark:text-slate-400">
             For: {request.quantity} {request.unit} · {request.itemName}
           </div>
 
@@ -1541,10 +1541,10 @@ function QuoteUploadModal({
               type="file"
               accept="image/*,application/pdf"
               onChange={(e) => pick(e.target.files?.[0] ?? null)}
-              className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-brand-700 hover:file:bg-brand-100"
+              className="block w-full text-sm text-slate-600 dark:text-slate-300 file:mr-3 file:rounded-md file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-brand-700 hover:file:bg-brand-100"
             />
             {file ? (
-              <div className="mt-1 text-xs text-slate-500">
+              <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                 {file.name} · {formatFileSize(file.size)}
               </div>
             ) : null}
@@ -1624,7 +1624,7 @@ function QuoteUploadModal({
                 />
               </div>
             </div>
-            <div className="flex justify-end gap-2 border-t border-slate-200 pt-3">
+            <div className="flex justify-end gap-2 border-t border-slate-200 dark:border-slate-800 pt-3">
               <button
                 type="button"
                 className="btn btn-secondary"
@@ -1681,13 +1681,13 @@ function GrnComparison({
   );
 
   return (
-    <div className="mt-2 rounded bg-white p-2 ring-1 ring-violet-100">
+    <div className="mt-2 rounded bg-white dark:bg-slate-900 p-2 ring-1 ring-violet-100">
       <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-violet-700">
         PO vs invoice
       </div>
       <table className="w-full text-[11px]">
         <thead>
-          <tr className="text-slate-500">
+          <tr className="text-slate-500 dark:text-slate-400">
             <th className="py-0.5 text-left">Item</th>
             <th className="py-0.5 text-right">Expected</th>
             <th className="py-0.5 text-right">Invoice</th>
@@ -1718,7 +1718,7 @@ function GrnComparison({
             );
           })}
           {extras.map((li, i) => (
-            <tr key={`x-${i}`} className="text-slate-600">
+            <tr key={`x-${i}`} className="text-slate-600 dark:text-slate-300">
               <td className="py-0.5">
                 <span className="inline-flex items-center gap-1">
                   <Receipt className="h-3 w-3 text-violet-500" />

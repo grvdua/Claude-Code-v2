@@ -201,6 +201,8 @@ export interface DocumentRecord {
   registeredEntity?: string;
   /** True if any field was AI-populated during upload. */
   aiExtracted?: boolean;
+  /** ISO timestamp the document was last marked as renewed via bulk action. */
+  renewedAt?: string;
 }
 
 export interface StaffMember {
@@ -371,3 +373,87 @@ export interface ReorderPredictionBundle {
   vendorLedger: ReorderVendorLedgerEntry[];
   priceHistory: ReorderPriceHistoryEntry[];
 }
+
+// ---------------------------------------------------------------------------
+// Phase 3 — Recipes + cost variance intelligence
+// ---------------------------------------------------------------------------
+
+export interface RecipeIngredient {
+  /** Reference to InventoryItem.id */
+  itemId: string;
+  /** Quantity per portion / per batch (consistent with the recipe). */
+  quantity: number;
+  /** Display unit; usually inherited from the inventory item. */
+  unit: string;
+}
+
+export interface Recipe {
+  id: string;
+  /** Recipe name e.g. "Butter Chicken", "Paneer Tikka". */
+  name: string;
+  /** "Main Course", "Starter", "Beverage" etc. */
+  category: string;
+  /** How many portions one batch yields. */
+  yieldPortions: number;
+  /** Selling price per portion in INR. */
+  sellingPricePerPortion: number;
+  ingredients: RecipeIngredient[];
+  createdAt: string;
+}
+
+export type CostVarianceFlag = 'ok' | 'warning' | 'critical';
+
+export interface CostVarianceInsight {
+  recipeId: string;
+  theoreticalCostPerPortion: number;
+  actualCostPerPortion: number;
+  /** (actual - theoretical) / theoretical * 100 */
+  variancePct: number;
+  /** actual / sellingPrice * 100 */
+  foodCostPct: number;
+  flag: CostVarianceFlag;
+  /** AI-identified factors driving the variance. */
+  drivers: string[];
+  recommendation: string;
+}
+
+export interface CostVarianceReport {
+  generatedAt: string;
+  perRecipe: CostVarianceInsight[];
+  overallSummary: string;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 3 — Expense category corrections (learn from manager edits)
+// ---------------------------------------------------------------------------
+
+export interface ExpenseCategoryCorrection {
+  id: string;
+  /** Vendor name at the time of correction (optional). */
+  vendorName?: string;
+  /** Tokens extracted from the expense notes — used for fuzzy match. */
+  descriptionKeywords: string[];
+  originalCategory: string;
+  correctedCategory: string;
+  correctedAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 3 — Revenue tracking for the Owner dashboard
+// ---------------------------------------------------------------------------
+
+export interface RevenueEntry {
+  id: string;
+  /** YYYY-MM-DD date the revenue was earned. */
+  date: string;
+  /** INR amount. */
+  amount: number;
+  notes?: string;
+  source: 'manual' | 'pos';
+}
+
+// ---------------------------------------------------------------------------
+// Phase 3 — Theme preference
+// ---------------------------------------------------------------------------
+
+export type ThemePreference = 'light' | 'dark' | 'system';

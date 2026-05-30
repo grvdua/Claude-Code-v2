@@ -26,7 +26,7 @@ export function ReliabilitySparkline({
 }: ReliabilitySparklineProps) {
   if (data.length === 0) {
     return (
-      <span className="text-[10px] text-slate-400" title="No reliability history yet">
+      <span className="text-[10px] text-slate-400 dark:text-slate-500" title="No reliability history yet">
         n/a
       </span>
     );

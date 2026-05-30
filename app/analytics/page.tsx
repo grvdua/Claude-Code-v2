@@ -48,7 +48,7 @@ export default function AnalyticsPage() {
   if (!mounted) return null;
   if (role !== 'owner' && role !== 'store-manager') {
     return (
-      <div className="card p-5 text-sm text-slate-600">
+      <div className="card p-5 text-sm text-slate-600 dark:text-slate-300">
         Analytics is available to Owner and Store Manager roles only.
       </div>
     );
@@ -61,8 +61,8 @@ export default function AnalyticsPage() {
           <BarChart3 className="h-5 w-5" />
         </span>
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Analytics</h1>
-          <p className="text-sm text-slate-600">
+          <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Analytics</h1>
+          <p className="text-sm text-slate-600 dark:text-slate-300">
             Price trends, vendor performance, and monthly procurement spend.
           </p>
         </div>
@@ -86,7 +86,7 @@ export default function AnalyticsPage() {
                 'flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition ' +
                 (active
                   ? 'bg-brand-50 text-brand-700 ring-1 ring-brand-200'
-                  : 'text-slate-600 hover:bg-slate-50')
+                  : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900/50')
               }
             >
               <Icon className="h-4 w-4" />
@@ -138,14 +138,14 @@ function ItemsTab({
 
   return (
     <section className="card p-5">
-      <h2 className="text-lg font-semibold text-slate-900">Inventory items</h2>
-      <p className="text-xs text-slate-500">
+      <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Inventory items</h2>
+      <p className="text-xs text-slate-500 dark:text-slate-400">
         Click an item to view its price history and consumption.
       </p>
       <div className="mt-3 overflow-x-auto">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-slate-200">
+            <tr className="border-b border-slate-200 dark:border-slate-800">
               <th className="table-th">Item</th>
               <th className="table-th">Category</th>
               <th className="table-th text-right">Current price</th>
@@ -153,7 +153,7 @@ function ItemsTab({
               <th className="table-th text-right">Δ</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {inventory.map((i) => {
               const phs = priceHistory.filter(
                 (p) =>
@@ -181,7 +181,7 @@ function ItemsTab({
                 <tr
                   key={i.id}
                   className={
-                    'cursor-pointer hover:bg-slate-50 ' +
+                    'cursor-pointer hover:bg-slate-50 dark:bg-slate-900/50 ' +
                     (selected === i.id ? 'bg-brand-50/40' : '')
                   }
                   onClick={() => onSelect(i.id)}
@@ -203,7 +203,7 @@ function ItemsTab({
                             ? 'text-rose-600'
                             : delta < -10
                             ? 'text-emerald-600'
-                            : 'text-slate-500')
+                            : 'text-slate-500 dark:text-slate-400')
                         }
                       >
                         {delta > 0 ? (
@@ -279,14 +279,14 @@ function ItemDrawer({ itemId, onClose }: { itemId: string; onClose: () => void }
     <section className="card border border-brand-200 p-5">
       <div className="flex items-start justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-slate-900">{item.name}</h3>
-          <p className="text-xs text-slate-500">
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{item.name}</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
             {item.category} · current stock {item.quantity} {item.unit}
           </p>
         </div>
         <button
           type="button"
-          className="rounded p-1 text-slate-400 hover:bg-slate-100"
+          className="rounded p-1 text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:bg-slate-800"
           onClick={onClose}
           aria-label="Close"
         >
@@ -295,8 +295,8 @@ function ItemDrawer({ itemId, onClose }: { itemId: string; onClose: () => void }
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2 rounded-lg border border-slate-100 p-3">
-          <div className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-500">
+        <div className="lg:col-span-2 rounded-lg border border-slate-100 dark:border-slate-800 p-3">
+          <div className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
             Price history (₹/{item.unit})
           </div>
           <LineChart
@@ -306,50 +306,50 @@ function ItemDrawer({ itemId, onClose }: { itemId: string; onClose: () => void }
             }))}
           />
         </div>
-        <div className="rounded-lg border border-slate-100 p-3 text-sm">
-          <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+        <div className="rounded-lg border border-slate-100 dark:border-slate-800 p-3 text-sm">
+          <div className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
             Stats
           </div>
           <dl className="mt-2 space-y-1.5">
             <div className="flex justify-between">
-              <dt className="text-slate-500">Min</dt>
+              <dt className="text-slate-500 dark:text-slate-400">Min</dt>
               <dd className="font-medium">{prices.length ? formatINR(min) : '—'}</dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-slate-500">Max</dt>
+              <dt className="text-slate-500 dark:text-slate-400">Max</dt>
               <dd className="font-medium">{prices.length ? formatINR(max) : '—'}</dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-slate-500">Avg</dt>
+              <dt className="text-slate-500 dark:text-slate-400">Avg</dt>
               <dd className="font-medium">{prices.length ? formatINR(avg) : '—'}</dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-slate-500">Wastage 30d</dt>
+              <dt className="text-slate-500 dark:text-slate-400">Wastage 30d</dt>
               <dd className="font-medium">
                 {wastage30d} {item.unit}
               </dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-slate-500">Est. monthly use</dt>
+              <dt className="text-slate-500 dark:text-slate-400">Est. monthly use</dt>
               <dd className="font-medium">
                 ~{wastage30d} {item.unit}
               </dd>
             </div>
           </dl>
-          <p className="mt-2 text-[10px] text-slate-400">
+          <p className="mt-2 text-[10px] text-slate-400 dark:text-slate-500">
             Estimate based on logged wastage; refine once GRN history accumulates.
           </p>
         </div>
       </div>
 
       <div className="mt-4">
-        <div className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-500">
+        <div className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
           Last 10 purchases
         </div>
-        <div className="overflow-x-auto rounded-lg border border-slate-100">
+        <div className="overflow-x-auto rounded-lg border border-slate-100 dark:border-slate-800">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-slate-100 bg-slate-50">
+              <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
                 <th className="table-th">Date</th>
                 <th className="table-th">Vendor</th>
                 <th className="table-th text-right">Qty</th>
@@ -357,10 +357,10 @@ function ItemDrawer({ itemId, onClose }: { itemId: string; onClose: () => void }
                 <th className="table-th text-right">Total</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {last10.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="table-td text-center text-xs text-slate-500">
+                  <td colSpan={5} className="table-td text-center text-xs text-slate-500 dark:text-slate-400">
                     No purchase history yet.
                   </td>
                 </tr>
@@ -407,11 +407,11 @@ function VendorsTab({
 
   return (
     <section className="card p-5">
-      <h2 className="text-lg font-semibold text-slate-900">Vendors</h2>
+      <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Vendors</h2>
       <div className="mt-3 overflow-x-auto">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-slate-200">
+            <tr className="border-b border-slate-200 dark:border-slate-800">
               <th className="table-th">Vendor</th>
               <th className="table-th">Category</th>
               <th className="table-th text-right">YTD spend</th>
@@ -420,7 +420,7 @@ function VendorsTab({
               <th className="table-th">Last order</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {vendors.map((v) => {
               const entries = vendorLedger.filter((e) => e.vendorId === v.id);
               const ytd = entries
@@ -439,7 +439,7 @@ function VendorsTab({
                 <tr
                   key={v.id}
                   className={
-                    'cursor-pointer hover:bg-slate-50 ' +
+                    'cursor-pointer hover:bg-slate-50 dark:bg-slate-900/50 ' +
                     (selected === v.id ? 'bg-brand-50/40' : '')
                   }
                   onClick={() => onSelect(v.id)}
@@ -455,7 +455,7 @@ function VendorsTab({
                   <td className="table-td text-right tabular-nums">
                     {entries.length ? formatINR(avg) : '—'}
                   </td>
-                  <td className="table-td text-xs text-slate-500">
+                  <td className="table-td text-xs text-slate-500 dark:text-slate-400">
                     {last ? formatDate(last.invoiceDate) : '—'}
                   </td>
                 </tr>
@@ -508,15 +508,15 @@ function VendorDrawer({
     <section className="card border border-brand-200 p-5">
       <div className="flex items-start justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-slate-900">{vendor.name}</h3>
-          <p className="text-xs text-slate-500">
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{vendor.name}</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
             {vendor.category} · {entries.length} invoice
             {entries.length === 1 ? '' : 's'}
           </p>
         </div>
         <button
           type="button"
-          className="rounded p-1 text-slate-400 hover:bg-slate-100"
+          className="rounded p-1 text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:bg-slate-800"
           onClick={onClose}
           aria-label="Close"
         >
@@ -525,25 +525,25 @@ function VendorDrawer({
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <div className="rounded-lg border border-slate-100 p-3">
-          <div className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+        <div className="rounded-lg border border-slate-100 dark:border-slate-800 p-3">
+          <div className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
             Ledger
           </div>
           <div className="max-h-72 overflow-y-auto">
             {entries.length === 0 ? (
-              <div className="text-xs text-slate-500">No invoices yet.</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400">No invoices yet.</div>
             ) : (
               <ul className="space-y-1.5 text-xs">
                 {entries.map((e) => (
                   <li
                     key={e.id}
-                    className="flex items-center justify-between rounded border border-slate-100 px-2 py-1.5"
+                    className="flex items-center justify-between rounded border border-slate-100 dark:border-slate-800 px-2 py-1.5"
                   >
                     <div>
-                      <div className="font-medium text-slate-900">
+                      <div className="font-medium text-slate-900 dark:text-slate-100">
                         {e.invoiceNumber || 'No #'} · {formatDate(e.invoiceDate)}
                       </div>
-                      <div className="text-slate-500">
+                      <div className="text-slate-500 dark:text-slate-400">
                         {e.itemName ?? '—'}{' '}
                         {e.quantity != null
                           ? `· ${e.quantity} ${e.unit ?? ''}`
@@ -559,18 +559,18 @@ function VendorDrawer({
             )}
           </div>
         </div>
-        <div className="rounded-lg border border-slate-100 p-3">
-          <div className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+        <div className="rounded-lg border border-slate-100 dark:border-slate-800 p-3">
+          <div className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
             Items supplied
           </div>
           {itemMap.size === 0 ? (
-            <div className="text-xs text-slate-500">No items recorded.</div>
+            <div className="text-xs text-slate-500 dark:text-slate-400">No items recorded.</div>
           ) : (
             <ul className="space-y-1.5 text-xs">
               {Array.from(itemMap.entries()).map(([name, agg]) => (
                 <li key={name} className="flex justify-between">
-                  <span className="text-slate-700">{name}</span>
-                  <span className="tabular-nums text-slate-500">
+                  <span className="text-slate-700 dark:text-slate-200">{name}</span>
+                  <span className="tabular-nums text-slate-500 dark:text-slate-400">
                     avg {formatINR(agg.total / Math.max(1, agg.qty))}/unit · {agg.count}x
                   </span>
                 </li>
@@ -631,8 +631,8 @@ function MonthlyTab() {
   return (
     <section className="card p-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-slate-900">Monthly procurement spend</h2>
-        <span className="text-xs text-slate-500">
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Monthly procurement spend</h2>
+        <span className="text-xs text-slate-500 dark:text-slate-400">
           6-month total · {formatINR(totalAll)}
         </span>
       </div>
@@ -646,7 +646,7 @@ function MonthlyTab() {
               className="inline-block h-3 w-3 rounded"
               style={{ backgroundColor: INVOICE_TYPE_COLOR[t] }}
             />
-            <span className="text-slate-600">{t}</span>
+            <span className="text-slate-600 dark:text-slate-300">{t}</span>
           </span>
         ))}
       </div>
