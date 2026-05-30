@@ -61,7 +61,7 @@ export default function HomePage() {
   return (
     <div className="space-y-8">
       <section className="text-center">
-        <div className="inline-flex items-center gap-2 rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700 ring-1 ring-brand-200">
+        <div className="inline-flex items-center gap-2 rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700 ring-1 ring-brand-200 dark:bg-brand-900/30 dark:text-brand-300 dark:ring-brand-800">
           Runs entirely in your browser — your data stays on this device
         </div>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 sm:text-4xl">
@@ -97,7 +97,7 @@ export default function HomePage() {
                   </li>
                 ))}
               </ul>
-              <span className="mt-auto inline-flex items-center gap-1 text-sm font-medium text-brand-700 group-hover:gap-2">
+              <span className="mt-auto inline-flex items-center gap-1 text-sm font-medium text-brand-700 dark:text-brand-300 group-hover:gap-2">
                 Enter
                 <ArrowRight className="h-4 w-4 transition-all" />
               </span>

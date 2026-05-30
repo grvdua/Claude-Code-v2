@@ -22,7 +22,7 @@ export function LineChart({
 }: LineChartProps) {
   if (data.length === 0) {
     return (
-      <div className="rounded-lg bg-slate-50 p-6 text-center text-xs text-slate-500">
+      <div className="rounded-lg bg-slate-50 dark:bg-slate-900/50 p-6 text-center text-xs text-slate-500 dark:text-slate-400">
         No data to chart.
       </div>
     );
@@ -54,63 +54,67 @@ export function LineChart({
     return { y: y(v), v };
   });
 
+  // Theme-aware wrapper: gridlines/labels read currentColor from these
+  // classes; the line/points keep their semantic accent color.
   return (
-    <svg
-      viewBox={`0 0 ${width} ${height}`}
-      className="w-full"
-      preserveAspectRatio="xMidYMid meet"
-      role="img"
-    >
-      {yLabel ? (
-        <text
-          x={6}
-          y={padT}
-          fontSize={10}
-          fill="#64748b"
-          dominantBaseline="hanging"
-        >
-          {yLabel}
-        </text>
-      ) : null}
-      {ticks.map((t, i) => (
-        <g key={i}>
-          <line
-            x1={padL}
-            x2={width - padR}
-            y1={t.y}
-            y2={t.y}
-            stroke="#e2e8f0"
-            strokeDasharray="2 3"
-          />
+    <div className="text-slate-300 dark:text-slate-700">
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="w-full"
+        preserveAspectRatio="xMidYMid meet"
+        role="img"
+      >
+        {yLabel ? (
           <text
-            x={padL - 4}
-            y={t.y}
-            fontSize={9}
-            fill="#94a3b8"
-            textAnchor="end"
-            dominantBaseline="middle"
+            x={6}
+            y={padT}
+            fontSize={10}
+            className="fill-slate-500 dark:fill-slate-400"
+            dominantBaseline="hanging"
           >
-            {Math.round(t.v)}
+            {yLabel}
           </text>
-        </g>
-      ))}
-      <path d={pathD} fill="none" stroke={color} strokeWidth={2} />
-      {data.map((d, i) => (
-        <g key={i}>
-          <circle cx={x(i)} cy={y(d.value)} r={3} fill={color} />
-          {data.length <= 12 ? (
+        ) : null}
+        {ticks.map((t, i) => (
+          <g key={i}>
+            <line
+              x1={padL}
+              x2={width - padR}
+              y1={t.y}
+              y2={t.y}
+              stroke="currentColor"
+              strokeDasharray="2 3"
+            />
             <text
-              x={x(i)}
-              y={height - 6}
+              x={padL - 4}
+              y={t.y}
               fontSize={9}
-              fill="#64748b"
-              textAnchor="middle"
+              className="fill-slate-500 dark:fill-slate-400"
+              textAnchor="end"
+              dominantBaseline="middle"
             >
-              {d.label}
+              {Math.round(t.v)}
             </text>
-          ) : null}
-        </g>
-      ))}
-    </svg>
+          </g>
+        ))}
+        <path d={pathD} fill="none" stroke={color} strokeWidth={2} />
+        {data.map((d, i) => (
+          <g key={i}>
+            <circle cx={x(i)} cy={y(d.value)} r={3} fill={color} />
+            {data.length <= 12 ? (
+              <text
+                x={x(i)}
+                y={height - 6}
+                fontSize={9}
+                className="fill-slate-500 dark:fill-slate-400"
+                textAnchor="middle"
+              >
+                {d.label}
+              </text>
+            ) : null}
+          </g>
+        ))}
+      </svg>
+    </div>
   );
 }

@@ -73,14 +73,14 @@ export default function ProcurementPage() {
                       className={
                         'rounded-full px-2.5 py-1 font-medium ring-1 ' +
                         (idx <= stage
-                          ? 'bg-brand-50 text-brand-700 ring-brand-200'
-                          : 'bg-slate-50 dark:bg-slate-900/50 text-slate-400 dark:text-slate-500 ring-slate-200 dark:ring-slate-800')
+                          ? 'bg-brand-50 text-brand-700 ring-brand-200 dark:bg-brand-900/30 dark:text-brand-300 dark:ring-brand-800'
+                          : 'bg-slate-50 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 ring-slate-200 dark:ring-slate-700')
                       }
                     >
                       {label}
                     </span>
                     {idx < pipelineLabels.length - 1 ? (
-                      <ChevronRight className="h-3.5 w-3.5 text-slate-300" />
+                      <ChevronRight className="h-3.5 w-3.5 text-slate-300 dark:text-slate-600" />
                     ) : null}
                   </li>
                 ))}

@@ -29,7 +29,7 @@ export function BarChart({
 }: BarChartProps) {
   if (data.length === 0) {
     return (
-      <div className="rounded-lg bg-slate-50 p-6 text-center text-xs text-slate-500">
+      <div className="rounded-lg bg-slate-50 dark:bg-slate-900/50 p-6 text-center text-xs text-slate-500 dark:text-slate-400">
         No data to chart.
       </div>
     );
@@ -55,111 +55,116 @@ export function BarChart({
     v: maxV * t,
   }));
 
+  // Theme-aware wrapper: gridlines inherit currentColor; axis/value labels
+  // use explicit fill classes that flip with dark mode. Bar fills keep
+  // their semantic accent colors.
   return (
-    <svg
-      viewBox={`0 0 ${width} ${height}`}
-      className="w-full"
-      preserveAspectRatio="xMidYMid meet"
-      role="img"
-    >
-      {ticks.map((t, i) => (
-        <g key={i}>
-          <line
-            x1={padL}
-            x2={width - padR}
-            y1={t.y}
-            y2={t.y}
-            stroke="#e2e8f0"
-            strokeDasharray="2 3"
-          />
-          <text
-            x={padL - 4}
-            y={t.y}
-            fontSize={9}
-            fill="#94a3b8"
-            textAnchor="end"
-            dominantBaseline="middle"
-          >
-            {formatValue ? formatValue(t.v) : Math.round(t.v)}
-          </text>
-        </g>
-      ))}
-      {data.map((d, i) => {
-        const x0 = padL + i * (barW + barGap);
-        const total = totals[i];
-        const barTopY = padT + innerH - (total / maxV) * innerH;
-        if (d.segments && d.segments.length > 0) {
-          let stackY = padT + innerH;
+    <div className="text-slate-300 dark:text-slate-700">
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="w-full"
+        preserveAspectRatio="xMidYMid meet"
+        role="img"
+      >
+        {ticks.map((t, i) => (
+          <g key={i}>
+            <line
+              x1={padL}
+              x2={width - padR}
+              y1={t.y}
+              y2={t.y}
+              stroke="currentColor"
+              strokeDasharray="2 3"
+            />
+            <text
+              x={padL - 4}
+              y={t.y}
+              fontSize={9}
+              className="fill-slate-500 dark:fill-slate-400"
+              textAnchor="end"
+              dominantBaseline="middle"
+            >
+              {formatValue ? formatValue(t.v) : Math.round(t.v)}
+            </text>
+          </g>
+        ))}
+        {data.map((d, i) => {
+          const x0 = padL + i * (barW + barGap);
+          const total = totals[i];
+          const barTopY = padT + innerH - (total / maxV) * innerH;
+          if (d.segments && d.segments.length > 0) {
+            let stackY = padT + innerH;
+            return (
+              <g key={i}>
+                {d.segments.map((seg, j) => {
+                  const h = (seg.value / maxV) * innerH;
+                  stackY -= h;
+                  return (
+                    <rect
+                      key={j}
+                      x={x0}
+                      y={stackY}
+                      width={barW}
+                      height={h}
+                      fill={seg.color}
+                    >
+                      <title>{`${seg.key}: ${formatValue ? formatValue(seg.value) : seg.value}`}</title>
+                    </rect>
+                  );
+                })}
+                <text
+                  x={x0 + barW / 2}
+                  y={height - 12}
+                  fontSize={9}
+                  className="fill-slate-500 dark:fill-slate-400"
+                  textAnchor="middle"
+                >
+                  {d.label}
+                </text>
+                <text
+                  x={x0 + barW / 2}
+                  y={barTopY - 3}
+                  fontSize={9}
+                  className="fill-slate-700 dark:fill-slate-200"
+                  textAnchor="middle"
+                >
+                  {formatValue ? formatValue(total) : total}
+                </text>
+              </g>
+            );
+          }
+          const h = (total / maxV) * innerH;
           return (
             <g key={i}>
-              {d.segments.map((seg, j) => {
-                const h = (seg.value / maxV) * innerH;
-                stackY -= h;
-                return (
-                  <rect
-                    key={j}
-                    x={x0}
-                    y={stackY}
-                    width={barW}
-                    height={h}
-                    fill={seg.color}
-                  >
-                    <title>{`${seg.key}: ${formatValue ? formatValue(seg.value) : seg.value}`}</title>
-                  </rect>
-                );
-              })}
+              <rect
+                x={x0}
+                y={padT + innerH - h}
+                width={barW}
+                height={h}
+                fill={color}
+              />
               <text
                 x={x0 + barW / 2}
                 y={height - 12}
                 fontSize={9}
-                fill="#64748b"
+                className="fill-slate-500 dark:fill-slate-400"
                 textAnchor="middle"
               >
                 {d.label}
               </text>
               <text
                 x={x0 + barW / 2}
-                y={barTopY - 3}
+                y={padT + innerH - h - 3}
                 fontSize={9}
-                fill="#334155"
+                className="fill-slate-700 dark:fill-slate-200"
                 textAnchor="middle"
               >
                 {formatValue ? formatValue(total) : total}
               </text>
             </g>
           );
-        }
-        const h = (total / maxV) * innerH;
-        return (
-          <g key={i}>
-            <rect
-              x={x0}
-              y={padT + innerH - h}
-              width={barW}
-              height={h}
-              fill={color}
-            />
-            <text
-              x={x0 + barW / 2}
-              y={height - 12}
-              fontSize={9}
-              fill="#64748b"
-              textAnchor="middle"
-            >
-              {d.label}
-            </text>
-            <text
-              x={x0 + barW / 2}
-              y={padT + innerH - h - 3}
-              fontSize={9}
-              fill="#334155"
-              textAnchor="middle"
-            >
-              {formatValue ? formatValue(total) : total}
-            </text>
-          </g>
-        );
-      })}
-    </svg>
+        })}
+      </svg>
+    </div>
   );
 }

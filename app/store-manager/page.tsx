@@ -432,7 +432,7 @@ export default function StoreManagerPage() {
             className={clsx(
               '-mb-px border-b-2 px-3 py-2 text-sm font-medium transition',
               tab === k
-                ? 'border-brand-600 text-brand-700'
+                ? 'border-brand-600 text-brand-700 dark:border-brand-400 dark:text-brand-300'
                 : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100'
             )}
           >
@@ -495,7 +495,7 @@ export default function StoreManagerPage() {
                           Stock for "{r.itemName}"
                         </div>
                         {stockFor(r.itemName).length === 0 ? (
-                          <div className="text-rose-600">
+                          <div className="text-rose-600 dark:text-rose-400">
                             No stock found — procurement needed.
                           </div>
                         ) : (
@@ -513,11 +513,11 @@ export default function StoreManagerPage() {
                                   <span className="text-slate-900 dark:text-slate-100">
                                     {s.quantity} {s.unit}{' '}
                                     {deficit > 0 ? (
-                                      <span className="ml-2 text-xs text-rose-600">
+                                      <span className="ml-2 text-xs text-rose-600 dark:text-rose-400">
                                         deficit {deficit}
                                       </span>
                                     ) : (
-                                      <span className="ml-2 text-xs text-emerald-600">
+                                      <span className="ml-2 text-xs text-emerald-600 dark:text-emerald-400">
                                         sufficient
                                       </span>
                                     )}
@@ -542,7 +542,7 @@ export default function StoreManagerPage() {
           </section>
 
           {rfqFor ? (
-            <section className="card border border-brand-300 p-5">
+            <section className="card border border-brand-300 dark:border-brand-800 p-5">
               <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
                 Raise RFQ — {rfqFor.quantity} {rfqFor.unit} {rfqFor.itemName}
               </h2>
@@ -680,7 +680,7 @@ export default function StoreManagerPage() {
           </div>
 
           {analyzeError ? (
-            <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+            <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-800 dark:bg-rose-900/30 dark:text-rose-300">
               {analyzeError}
             </div>
           ) : null}
@@ -822,7 +822,7 @@ export default function StoreManagerPage() {
                                   <Fragment key={q.id}>
                                     <tr
                                       className={clsx(
-                                        recommended && 'bg-emerald-50/40'
+                                        recommended && 'bg-emerald-50/40 dark:bg-emerald-900/20'
                                       )}
                                     >
                                       <td className="table-td">
@@ -830,7 +830,7 @@ export default function StoreManagerPage() {
                                           {v?.name ?? q.vendorId}
                                         </div>
                                         {recommended ? (
-                                          <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-800">
+                                          <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200">
                                             <CheckCircle2 className="h-3 w-3" />
                                             Recommended
                                           </span>
@@ -896,7 +896,7 @@ export default function StoreManagerPage() {
                                         >
                                           <div className="grid gap-3 sm:grid-cols-2">
                                             <div>
-                                              <div className="font-semibold text-emerald-700">
+                                              <div className="font-semibold text-emerald-700 dark:text-emerald-400">
                                                 Pros
                                               </div>
                                               <ul className="mt-1 list-inside list-disc space-y-0.5 text-slate-700 dark:text-slate-200">
@@ -910,7 +910,7 @@ export default function StoreManagerPage() {
                                               </ul>
                                             </div>
                                             <div>
-                                              <div className="font-semibold text-rose-700">
+                                              <div className="font-semibold text-rose-700 dark:text-rose-400">
                                                 Cons
                                               </div>
                                               <ul className="mt-1 list-inside list-disc space-y-0.5 text-slate-700 dark:text-slate-200">
@@ -1035,7 +1035,7 @@ export default function StoreManagerPage() {
                                   onClick={() =>
                                     viewDocument(p.invoiceDocumentId as string)
                                   }
-                                  className="inline-flex items-center gap-1 text-brand-700 hover:underline"
+                                  className="inline-flex items-center gap-1 text-brand-700 dark:text-brand-300 hover:underline"
                                   title="View attached invoice"
                                 >
                                   <Paperclip className="h-3.5 w-3.5" />
@@ -1175,14 +1175,14 @@ export default function StoreManagerPage() {
               <button
                 type="button"
                 onClick={() => setGrnForPO(null)}
-                className="rounded p-1 text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:bg-slate-800"
+                className="rounded p-1 text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
                 aria-label="Close"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
             {grnError ? (
-              <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-sm text-rose-700">
+              <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-sm text-rose-700 dark:border-rose-800 dark:bg-rose-900/30 dark:text-rose-300">
                 {grnError}
               </div>
             ) : null}
@@ -1195,7 +1195,7 @@ export default function StoreManagerPage() {
                 onChange={(e) =>
                   handleGrnInvoicePick(e.target.files?.[0] ?? null)
                 }
-                className="block w-full text-sm text-slate-600 dark:text-slate-300 file:mr-3 file:rounded-md file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-brand-700 hover:file:bg-brand-100"
+                className="block w-full text-sm text-slate-600 dark:text-slate-300 file:mr-3 file:rounded-md file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-brand-700 hover:file:bg-brand-100 dark:file:bg-brand-900/30 dark:file:text-brand-300 dark:hover:file:bg-brand-900/50"
               />
               {grnInvoice ? (
                 <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
@@ -1203,14 +1203,14 @@ export default function StoreManagerPage() {
                 </div>
               ) : null}
               {grnExtracting ? (
-                <div className="mt-2 inline-flex items-center gap-1.5 text-xs text-brand-700">
+                <div className="mt-2 inline-flex items-center gap-1.5 text-xs text-brand-700 dark:text-brand-300">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" /> Extracting line
                   items...
                 </div>
               ) : null}
               {grnExtracted ? (
-                <div className="mt-2 rounded-lg border border-violet-200 bg-violet-50/60 p-2 text-xs">
-                  <div className="flex items-center gap-1 font-medium text-violet-900">
+                <div className="mt-2 rounded-lg border border-violet-200 bg-violet-50/60 p-2 text-xs dark:border-violet-800 dark:bg-violet-900/20">
+                  <div className="flex items-center gap-1 font-medium text-violet-900 dark:text-violet-200">
                     <Sparkles className="h-3.5 w-3.5" />
                     {grnExtracted.invoiceType} invoice from{' '}
                     {grnExtracted.vendorName || '—'} ·{' '}
@@ -1284,8 +1284,8 @@ function SortButton({
       className={clsx(
         'inline-flex items-center gap-0.5 rounded px-1.5 py-0.5',
         active
-          ? 'bg-brand-50 text-brand-700 ring-1 ring-brand-200'
-          : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:bg-slate-800'
+          ? 'bg-brand-50 text-brand-700 ring-1 ring-brand-200 dark:bg-brand-900/30 dark:text-brand-300 dark:ring-brand-800'
+          : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
       )}
     >
       {children}
@@ -1317,7 +1317,7 @@ function SortHeader({
       onClick={onClick}
       className={clsx(
         'inline-flex items-center gap-0.5',
-        active ? 'text-brand-700' : 'text-slate-500 dark:text-slate-400'
+        active ? 'text-brand-700 dark:text-brand-300' : 'text-slate-500 dark:text-slate-400'
       )}
     >
       {label}
@@ -1349,22 +1349,22 @@ function RecommendationBanner({
     recQuote?.vendorId ??
     '—';
   return (
-    <div className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+    <div className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-800 dark:bg-emerald-900/30">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2 text-sm font-semibold text-emerald-900">
+          <div className="flex items-center gap-2 text-sm font-semibold text-emerald-900 dark:text-emerald-200">
             <Sparkles className="h-4 w-4" />
             Recommended: {vendorName}
             {analysis.estimatedSavingsINR > 0 ? (
-              <span className="text-emerald-800">
+              <span className="text-emerald-800 dark:text-emerald-200">
                 — Est. savings {formatINR(analysis.estimatedSavingsINR)}{' '}
-                <span className="text-[10px] uppercase tracking-wide text-emerald-700">
+                <span className="text-[10px] uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
                   {analysis.savingsBaseline}
                 </span>
               </span>
             ) : null}
           </div>
-          <p className="mt-1 max-w-3xl text-xs text-emerald-900/80">
+          <p className="mt-1 max-w-3xl text-xs text-emerald-900/80 dark:text-emerald-200/80">
             {analysis.summary}
           </p>
         </div>
@@ -1518,7 +1518,7 @@ function QuoteUploadModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full p-1 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:bg-slate-800"
+            className="rounded-full p-1 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
           >
             <X className="h-5 w-5" />
           </button>
@@ -1529,7 +1529,7 @@ function QuoteUploadModal({
           </div>
 
           {error ? (
-            <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-sm text-rose-700">
+            <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-sm text-rose-700 dark:border-rose-800 dark:bg-rose-900/30 dark:text-rose-300">
               {error}
             </div>
           ) : null}
@@ -1541,7 +1541,7 @@ function QuoteUploadModal({
               type="file"
               accept="image/*,application/pdf"
               onChange={(e) => pick(e.target.files?.[0] ?? null)}
-              className="block w-full text-sm text-slate-600 dark:text-slate-300 file:mr-3 file:rounded-md file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-brand-700 hover:file:bg-brand-100"
+              className="block w-full text-sm text-slate-600 dark:text-slate-300 file:mr-3 file:rounded-md file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-brand-700 hover:file:bg-brand-100 dark:file:bg-brand-900/30 dark:file:text-brand-300 dark:hover:file:bg-brand-900/50"
             />
             {file ? (
               <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
@@ -1549,12 +1549,12 @@ function QuoteUploadModal({
               </div>
             ) : null}
             {analyzing ? (
-              <div className="mt-1 inline-flex items-center gap-1.5 text-xs text-brand-700">
+              <div className="mt-1 inline-flex items-center gap-1.5 text-xs text-brand-700 dark:text-brand-300">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" /> Extracting…
               </div>
             ) : null}
             {extracted ? (
-              <div className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-700 ring-1 ring-violet-200">
+              <div className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-700 ring-1 ring-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:ring-violet-800">
                 <Sparkles className="h-3 w-3" /> Pre-filled — review before saving
               </div>
             ) : null}
@@ -1681,8 +1681,8 @@ function GrnComparison({
   );
 
   return (
-    <div className="mt-2 rounded bg-white dark:bg-slate-900 p-2 ring-1 ring-violet-100">
-      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-violet-700">
+    <div className="mt-2 rounded bg-white dark:bg-slate-900 p-2 ring-1 ring-violet-100 dark:ring-violet-800">
+      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-violet-700 dark:text-violet-300">
         PO vs invoice
       </div>
       <table className="w-full text-[11px]">
@@ -1706,10 +1706,10 @@ function GrnComparison({
                   className={
                     'py-0.5 text-right tabular-nums ' +
                     (diff === 0
-                      ? 'text-emerald-700'
+                      ? 'text-emerald-700 dark:text-emerald-400'
                       : diff > 0
-                      ? 'text-amber-700'
-                      : 'text-rose-700')
+                      ? 'text-amber-700 dark:text-amber-400'
+                      : 'text-rose-700 dark:text-rose-400')
                   }
                 >
                   {r.actualQty} {r.unit}

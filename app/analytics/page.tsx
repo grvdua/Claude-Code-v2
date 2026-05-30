@@ -85,8 +85,8 @@ export default function AnalyticsPage() {
               className={
                 'flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition ' +
                 (active
-                  ? 'bg-brand-50 text-brand-700 ring-1 ring-brand-200'
-                  : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900/50')
+                  ? 'bg-brand-50 text-brand-700 ring-1 ring-brand-200 dark:bg-brand-900/30 dark:text-brand-300 dark:ring-brand-800'
+                  : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800')
               }
             >
               <Icon className="h-4 w-4" />
@@ -181,8 +181,8 @@ function ItemsTab({
                 <tr
                   key={i.id}
                   className={
-                    'cursor-pointer hover:bg-slate-50 dark:bg-slate-900/50 ' +
-                    (selected === i.id ? 'bg-brand-50/40' : '')
+                    'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/60 ' +
+                    (selected === i.id ? 'bg-brand-50/40 dark:bg-brand-900/20' : '')
                   }
                   onClick={() => onSelect(i.id)}
                 >
@@ -276,7 +276,7 @@ function ItemDrawer({ itemId, onClose }: { itemId: string; onClose: () => void }
     .slice(0, 10);
 
   return (
-    <section className="card border border-brand-200 p-5">
+    <section className="card border border-brand-200 dark:border-brand-800 p-5">
       <div className="flex items-start justify-between">
         <div>
           <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{item.name}</h3>
@@ -286,7 +286,7 @@ function ItemDrawer({ itemId, onClose }: { itemId: string; onClose: () => void }
         </div>
         <button
           type="button"
-          className="rounded p-1 text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:bg-slate-800"
+          className="rounded p-1 text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
           onClick={onClose}
           aria-label="Close"
         >
@@ -439,8 +439,8 @@ function VendorsTab({
                 <tr
                   key={v.id}
                   className={
-                    'cursor-pointer hover:bg-slate-50 dark:bg-slate-900/50 ' +
-                    (selected === v.id ? 'bg-brand-50/40' : '')
+                    'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/60 ' +
+                    (selected === v.id ? 'bg-brand-50/40 dark:bg-brand-900/20' : '')
                   }
                   onClick={() => onSelect(v.id)}
                 >
@@ -505,7 +505,7 @@ function VendorDrawer({
   }
 
   return (
-    <section className="card border border-brand-200 p-5">
+    <section className="card border border-brand-200 dark:border-brand-800 p-5">
       <div className="flex items-start justify-between">
         <div>
           <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{vendor.name}</h3>
@@ -516,7 +516,7 @@ function VendorDrawer({
         </div>
         <button
           type="button"
-          className="rounded p-1 text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:bg-slate-800"
+          className="rounded p-1 text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
           onClick={onClose}
           aria-label="Close"
         >
