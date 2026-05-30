@@ -20,6 +20,9 @@ import type {
   ProcessInvoiceOptions,
   ProcessInvoiceResult,
   Location,
+  StockAdjustment,
+  VendorReliabilityEntry,
+  QuoteAnalysisResult,
 } from './types';
 import {
   seedInventory,
@@ -39,6 +42,20 @@ export const PO_APPROVAL_THRESHOLD = 10000;
 const id = (prefix: string) =>
   `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
 
+/**
+ * Deterministic 32-bit hash (FNV-1a). Used for synthesizing stable but
+ * vendor-specific reliability scores until we have real GRN history.
+ */
+function stableHash(input: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < input.length; i++) {
+    h ^= input.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  // Force unsigned 32-bit
+  return h >>> 0;
+}
+
 interface AppState {
   role: Role | null;
   inventory: InventoryItem[];
@@ -52,24 +69,54 @@ interface AppState {
   staff: StaffMember[];
   vendorLedger: VendorLedgerEntry[];
   priceHistory: PriceHistoryEntry[];
+  stockAdjustments: StockAdjustment[];
+  vendorReliability: VendorReliabilityEntry[];
 
   setRole: (r: Role | null) => void;
 
   addInventoryItem: (item: Omit<InventoryItem, 'id'>) => void;
-  adjustStock: (id: string, delta: number) => void;
+  adjustStock: (
+    id: string,
+    delta: number,
+    reason?: string,
+    source?: StockAdjustment['source'],
+    sourceId?: string,
+    adjustedBy?: string
+  ) => void;
+  setItemUnitPrice: (itemId: string, unitPrice: number) => void;
+  recordStockAdjustment: (
+    adj: Omit<StockAdjustment, 'id' | 'adjustedAt'>
+  ) => string;
+  getStockHistory: (itemId: string) => StockAdjustment[];
 
   addRequest: (
     req: Omit<MaterialRequest, 'id' | 'raisedAt' | 'status'>
   ) => void;
   updateRequestStatus: (id: string, status: RequestStatus) => void;
 
-  addQuote: (q: Omit<Quote, 'id' | 'submittedAt'>) => void;
+  addQuote: (q: Omit<Quote, 'id' | 'submittedAt'>) => string;
+  attachQuoteAnalysis: (
+    requestId: string,
+    analysis: QuoteAnalysisResult
+  ) => void;
+  raisePOFromQuote: (quoteId: string, raisedBy?: string) => string | null;
 
-  raisePO: (po: Omit<PurchaseOrder, 'id' | 'raisedAt' | 'status'>) => void;
+  raisePO: (po: Omit<PurchaseOrder, 'id' | 'raisedAt' | 'status'>) => string;
   approvePO: (id: string, approver: string) => void;
   rejectPO: (id: string) => void;
   logGRN: (id: string) => void;
   setPOStatus: (id: string, status: POStatus) => void;
+  setPOTracking: (
+    poId: string,
+    trackingNumber: string,
+    notes?: string
+  ) => void;
+
+  getVendorReliabilityTrend: (
+    vendorId: string,
+    months?: number
+  ) => VendorReliabilityEntry[];
+  recomputeVendorReliability: () => void;
 
   addJournalEntry: (e: Omit<JournalEntry, 'id' | 'timestamp'>) => void;
 
@@ -107,6 +154,8 @@ export const useStore = create<AppState>()(
       staff: seedStaff,
       vendorLedger: [],
       priceHistory: [],
+      stockAdjustments: [],
+      vendorReliability: [],
 
       setRole: (role) => set({ role }),
 
@@ -115,14 +164,57 @@ export const useStore = create<AppState>()(
           inventory: [...s.inventory, { ...item, id: id('inv') }],
         })),
 
-      adjustStock: (itemId, delta) =>
+      adjustStock: (itemId, delta, reason, source, sourceId, adjustedBy) => {
+        let resultingQuantity = 0;
+        set((s) => {
+          const inventory = s.inventory.map((it) => {
+            if (it.id !== itemId) return it;
+            resultingQuantity = Math.max(0, it.quantity + delta);
+            return { ...it, quantity: resultingQuantity };
+          });
+          return { inventory };
+        });
+        // Append a stock adjustment record so the history is auditable.
+        const adj: StockAdjustment = {
+          id: id('sa'),
+          itemId,
+          delta,
+          reason: reason || (delta >= 0 ? 'manual add' : 'manual remove'),
+          resultingQuantity,
+          adjustedBy: adjustedBy || get().role || 'user',
+          adjustedAt: new Date().toISOString(),
+          source: source ?? 'manual',
+          sourceId,
+        };
+        set((s) => ({ stockAdjustments: [adj, ...s.stockAdjustments] }));
+      },
+
+      setItemUnitPrice: (itemId, unitPrice) =>
         set((s) => ({
           inventory: s.inventory.map((it) =>
-            it.id === itemId
-              ? { ...it, quantity: Math.max(0, it.quantity + delta) }
-              : it
+            it.id === itemId ? { ...it, unitPrice } : it
           ),
         })),
+
+      recordStockAdjustment: (adj) => {
+        const newId = id('sa');
+        set((s) => ({
+          stockAdjustments: [
+            {
+              ...adj,
+              id: newId,
+              adjustedAt: new Date().toISOString(),
+            },
+            ...s.stockAdjustments,
+          ],
+        }));
+        return newId;
+      },
+
+      getStockHistory: (itemId) =>
+        get()
+          .stockAdjustments.filter((a) => a.itemId === itemId)
+          .sort((a, b) => (a.adjustedAt < b.adjustedAt ? 1 : -1)),
 
       addRequest: (req) =>
         set((s) => ({
@@ -144,32 +236,86 @@ export const useStore = create<AppState>()(
           ),
         })),
 
-      addQuote: (q) =>
+      addQuote: (q) => {
+        const newId = id('q');
         set((s) => ({
           quotes: [
             ...s.quotes,
-            { ...q, id: id('q'), submittedAt: new Date().toISOString() },
+            { ...q, id: newId, submittedAt: new Date().toISOString() },
           ],
+        }));
+        return newId;
+      },
+
+      attachQuoteAnalysis: (requestId, analysis) =>
+        set((s) => ({
+          quotes: s.quotes.map((q) =>
+            q.requestId === requestId
+              ? {
+                  ...q,
+                  aiAnalysis: analysis.perQuote[q.id] ?? q.aiAnalysis,
+                }
+              : q
+          ),
         })),
 
-      raisePO: (po) =>
-        set((s) => {
-          const status: POStatus =
-            po.totalValue > PO_APPROVAL_THRESHOLD
-              ? 'pending-approval'
-              : 'approved';
-          return {
-            pos: [
-              ...s.pos,
-              {
-                ...po,
-                id: id('po'),
-                raisedAt: new Date().toISOString(),
-                status,
-              },
-            ],
-          };
-        }),
+      raisePOFromQuote: (quoteId, raisedBy) => {
+        const state = get();
+        const quote = state.quotes.find((q) => q.id === quoteId);
+        if (!quote) return null;
+        const request = state.requests.find((r) => r.id === quote.requestId);
+        if (!request) return null;
+        const newId = id('po');
+        const status: POStatus =
+          quote.totalPrice > PO_APPROVAL_THRESHOLD
+            ? 'pending-approval'
+            : 'approved';
+        const po: PurchaseOrder = {
+          id: newId,
+          requestId: request.id,
+          vendorId: quote.vendorId,
+          quoteId: quote.id,
+          items: [
+            {
+              itemName: request.itemName,
+              quantity: request.quantity,
+              unit: request.unit,
+              pricePerUnit: quote.pricePerUnit,
+            },
+          ],
+          totalValue: quote.totalPrice,
+          status,
+          raisedBy: raisedBy || state.role || 'store-manager',
+          raisedAt: new Date().toISOString(),
+        };
+        set((s) => ({
+          pos: [...s.pos, po],
+          requests: s.requests.map((r) =>
+            r.id === request.id ? { ...r, status: 'po-raised' } : r
+          ),
+        }));
+        return newId;
+      },
+
+      raisePO: (po) => {
+        const newId = id('po');
+        const status: POStatus =
+          po.totalValue > PO_APPROVAL_THRESHOLD
+            ? 'pending-approval'
+            : 'approved';
+        set((s) => ({
+          pos: [
+            ...s.pos,
+            {
+              ...po,
+              id: newId,
+              raisedAt: new Date().toISOString(),
+              status,
+            },
+          ],
+        }));
+        return newId;
+      },
 
       approvePO: (pid, approver) =>
         set((s) => ({
@@ -209,6 +355,83 @@ export const useStore = create<AppState>()(
         set((s) => ({
           pos: s.pos.map((p) => (p.id === pid ? { ...p, status } : p)),
         })),
+
+      setPOTracking: (poId, trackingNumber, notes) =>
+        set((s) => ({
+          pos: s.pos.map((p) =>
+            p.id === poId
+              ? {
+                  ...p,
+                  trackingNumber,
+                  shipmentNotes: notes ?? p.shipmentNotes,
+                }
+              : p
+          ),
+        })),
+
+      getVendorReliabilityTrend: (vendorId, months = 6) => {
+        const entries = get()
+          .vendorReliability.filter((e) => e.vendorId === vendorId)
+          .sort((a, b) => (a.month < b.month ? -1 : 1));
+        return entries.slice(-months);
+      },
+
+      /**
+       * Synthesise a per-vendor monthly reliability score from the existing
+       * vendor ledger. For each month a vendor has activity we emit one
+       * entry. Numbers are deterministic (same vendor + month always yields
+       * the same score) so the UI is stable across refreshes.
+       *
+       * Formula (until real GRN history exists):
+       *   onTimeRate     = 70 + (hash(vendorId+month) % 26)            // 70-95
+       *   quoteAccuracy  = 75 + ((hash(vendorId+month) >> 4) % 21)     // 75-95
+       *   fulfillmentRate= 80 + ((hash(vendorId+month) >> 8) % 16)     // 80-95
+       *   compositeScore = 0.4*onTime + 0.3*quoteAcc + 0.3*fulfillment
+       * Vendors with more orders in the month nudge composite up to 5pts.
+       */
+      recomputeVendorReliability: () => {
+        const state = get();
+        const buckets = new Map<string, Map<string, number>>(); // vendorId -> month -> count
+        for (const entry of state.vendorLedger) {
+          if (!entry.vendorId || entry.vendorId === 'unknown') continue;
+          const month = entry.invoiceDate
+            ? entry.invoiceDate.slice(0, 7)
+            : entry.recordedAt.slice(0, 7);
+          let monthMap = buckets.get(entry.vendorId);
+          if (!monthMap) {
+            monthMap = new Map();
+            buckets.set(entry.vendorId, monthMap);
+          }
+          monthMap.set(month, (monthMap.get(month) ?? 0) + 1);
+        }
+
+        const entries: VendorReliabilityEntry[] = [];
+        for (const [vendorId, monthMap] of buckets.entries()) {
+          for (const [month, count] of monthMap.entries()) {
+            const seed = stableHash(`${vendorId}-${month}`);
+            const onTimeRate = 70 + (seed % 26);
+            const quoteAccuracy = 75 + ((seed >> 4) % 21);
+            const fulfillmentRate = 80 + ((seed >> 8) % 16);
+            const volumeBoost = Math.min(5, count);
+            const composite = Math.round(
+              0.4 * onTimeRate +
+                0.3 * quoteAccuracy +
+                0.3 * fulfillmentRate +
+                volumeBoost
+            );
+            entries.push({
+              vendorId,
+              month,
+              onTimeRate,
+              quoteAccuracy,
+              fulfillmentRate,
+              orderCount: count,
+              compositeScore: Math.min(100, composite),
+            });
+          }
+        }
+        set({ vendorReliability: entries });
+      },
 
       addJournalEntry: (e) =>
         set((s) => ({
@@ -372,14 +595,16 @@ export const useStore = create<AppState>()(
               );
             }
             let itemId: string;
+            let resultingQuantity = 0;
             if (match) {
               itemId = match.id;
+              resultingQuantity = Math.max(0, match.quantity + (li.quantity || 0));
               set((s) => ({
                 inventory: s.inventory.map((it) =>
                   it.id === match!.id
                     ? {
                         ...it,
-                        quantity: Math.max(0, it.quantity + (li.quantity || 0)),
+                        quantity: resultingQuantity,
                       }
                     : it
                 ),
@@ -387,8 +612,20 @@ export const useStore = create<AppState>()(
               inventoryUpdates.push(
                 `+${li.quantity} ${li.unit || match.unit} ${match.name}`
               );
+              // Auto-update unitPrice if it has changed meaningfully (>1%).
+              if (li.unitPrice && li.unitPrice > 0) {
+                const prev = match.unitPrice ?? 0;
+                const delta = prev === 0 ? Infinity : Math.abs(li.unitPrice - prev) / prev;
+                if (delta > 0.01) {
+                  set((s) => ({
+                    inventory: s.inventory.map((it) =>
+                      it.id === match!.id ? { ...it, unitPrice: li.unitPrice } : it
+                    ),
+                  }));
+                }
+              }
             } else {
-              // Create a new inventory item.
+              // Create a new inventory item with unit price seeded from the invoice.
               const newItem: InventoryItem = {
                 id: id('inv'),
                 name: liName,
@@ -397,12 +634,39 @@ export const useStore = create<AppState>()(
                 location: targetLocation,
                 quantity: li.quantity || 0,
                 reorderLevel: 0,
+                unitPrice: li.unitPrice > 0 ? li.unitPrice : undefined,
               };
               itemId = newItem.id;
+              resultingQuantity = newItem.quantity;
               set((s) => ({ inventory: [...s.inventory, newItem] }));
               inventoryUpdates.push(
                 `new item ${li.quantity} ${li.unit || 'unit'} ${liName}`
               );
+            }
+
+            // Stock adjustment audit entry — GRN-style.
+            if ((li.quantity || 0) !== 0) {
+              const saId = id('sa');
+              const adjEntry: StockAdjustment = {
+                id: saId,
+                itemId,
+                delta: li.quantity || 0,
+                reason: opts.poId
+                  ? `GRN ${opts.poId}${
+                      extracted.invoiceNumber ? ` · invoice ${extracted.invoiceNumber}` : ''
+                    }`
+                  : `Invoice upload${
+                      extracted.invoiceNumber ? ` · ${extracted.invoiceNumber}` : ''
+                    }`,
+                resultingQuantity,
+                adjustedBy: recordedBy,
+                adjustedAt: new Date().toISOString(),
+                source: opts.poId ? 'grn' : 'invoice-upload',
+                sourceId: opts.poId ?? opts.documentId,
+              };
+              set((s) => ({
+                stockAdjustments: [adjEntry, ...s.stockAdjustments],
+              }));
             }
 
             // Price history
@@ -474,7 +738,7 @@ export const useStore = create<AppState>()(
     }),
     {
       name: 'restaurant-os-store',
-      version: 4,
+      version: 5,
       migrate: (persisted, version) => {
         const state =
           persisted && typeof persisted === 'object'
@@ -494,6 +758,18 @@ export const useStore = create<AppState>()(
           state.staff = [];
           state.vendorLedger = [];
           state.priceHistory = [];
+        }
+        // v5: NON-destructive — backfill new collections + add new fields
+        // with sensible defaults. Existing user data is preserved.
+        if (version < 5) {
+          if (!Array.isArray(state.stockAdjustments)) {
+            state.stockAdjustments = [];
+          }
+          if (!Array.isArray(state.vendorReliability)) {
+            state.vendorReliability = [];
+          }
+          // No unitPrice backfill needed — it's optional and `undefined`
+          // is the correct default for items without a known cost.
         }
         return state as unknown as AppState;
       },

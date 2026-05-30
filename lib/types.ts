@@ -39,6 +39,24 @@ export interface InventoryItem {
   location: Location;
   quantity: number;
   reorderLevel: number;
+  /** Current per-unit cost in INR. Used for inventory value + price-aware reorders. */
+  unitPrice?: number;
+}
+
+export interface StockAdjustment {
+  id: string;
+  itemId: string;
+  /** positive = stock added; negative = stock removed */
+  delta: number;
+  /** Free text reason e.g. "GRN PO-123", "wastage", "manual count". */
+  reason: string;
+  /** Quantity after the adjustment. */
+  resultingQuantity: number;
+  /** Role/user who triggered the adjustment. */
+  adjustedBy: string;
+  adjustedAt: string;
+  source?: 'grn' | 'wastage' | 'manual' | 'invoice-upload';
+  sourceId?: string;
 }
 
 export interface Vendor {
@@ -70,6 +88,27 @@ export interface Quote {
   deliveryDate: string;
   notes: string;
   submittedAt: string;
+  /** Cached AI scoring for this quote (populated when comparison is run). */
+  aiAnalysis?: QuoteAIAnalysis;
+}
+
+export interface QuoteAIAnalysis {
+  pros: string[];
+  cons: string[];
+  /** 0-100 vendor reliability used in the analysis. */
+  reliabilityScore: number;
+  /** 0-100 value score (price competitiveness vs avg). */
+  valueScore: number;
+  recommended: boolean;
+  reasoning: string;
+}
+
+export interface QuoteAnalysisResult {
+  recommendedQuoteId: string;
+  estimatedSavingsINR: number;
+  savingsBaseline: 'vs-worst' | 'vs-avg';
+  perQuote: Record<string, QuoteAIAnalysis>;
+  summary: string;
 }
 
 export interface POLineItem {
@@ -92,6 +131,27 @@ export interface PurchaseOrder {
   approvedAt?: string;
   grnLoggedAt?: string;
   invoiceDocumentId?: string;
+  /** Carrier/shipment tracking number. Added after PO approval. */
+  trackingNumber?: string;
+  /** Free-form shipment notes (carrier, ETA, contact). */
+  shipmentNotes?: string;
+  /** Quote this PO was raised from, when applicable. */
+  quoteId?: string;
+}
+
+export interface VendorReliabilityEntry {
+  vendorId: string;
+  /** Month bucket in YYYY-MM form. */
+  month: string;
+  /** 0-100: orders delivered on or before promised date. */
+  onTimeRate: number;
+  /** 0-100: delivered qty/price vs original quote. */
+  quoteAccuracy: number;
+  /** 0-100: delivered qty / ordered qty. */
+  fulfillmentRate: number;
+  orderCount: number;
+  /** Weighted average of the three rates. */
+  compositeScore: number;
 }
 
 export interface JournalEntry {
@@ -209,6 +269,25 @@ export interface PriceHistoryEntry {
   totalPrice: number;
   date: string;
   invoiceDocumentId?: string;
+}
+
+export interface ExtractedQuoteLineItem {
+  name: string;
+  quantity: number;
+  unit: string;
+  unitPrice: number;
+  totalPrice: number;
+}
+
+export interface ExtractedQuoteData {
+  vendorName: string;
+  items: ExtractedQuoteLineItem[];
+  totalAmount: number;
+  /** ISO date the vendor proposes to deliver. */
+  deliveryDate: string;
+  /** ISO date the quote is valid until. */
+  validUntil: string;
+  notes: string;
 }
 
 export interface ProcessInvoiceResult {

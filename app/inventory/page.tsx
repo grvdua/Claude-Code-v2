@@ -10,8 +10,9 @@ import {
   Sparkles,
   Upload,
   X,
+  History,
 } from 'lucide-react';
-import { useStore, formatINR } from '@/lib/store';
+import { useStore, formatINR, formatDateTime } from '@/lib/store';
 import { useMounted } from '@/lib/useMounted';
 import type {
   Location,
@@ -53,6 +54,7 @@ export default function InventoryPage() {
   const addInventoryItem = useStore((s) => s.addInventoryItem);
   const addDocument = useStore((s) => s.addDocument);
   const processInvoiceExtraction = useStore((s) => s.processInvoiceExtraction);
+  const getStockHistory = useStore((s) => s.getStockHistory);
 
   const [loc, setLoc] = useState<'all' | Location>('all');
   const [cat, setCat] = useState<string>('all');
@@ -64,6 +66,8 @@ export default function InventoryPage() {
   const [newLoc, setNewLoc] = useState<Location>('store-1');
   const [qty, setQty] = useState('');
   const [reorder, setReorder] = useState('');
+  const [unitPriceInput, setUnitPriceInput] = useState('');
+  const [historyFor, setHistoryFor] = useState<string | null>(null);
 
   // Invoice upload modal state.
   const [invoiceOpen, setInvoiceOpen] = useState(false);
@@ -90,6 +94,7 @@ export default function InventoryPage() {
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !qty || !reorder) return;
+    const upNum = Number(unitPriceInput);
     addInventoryItem({
       name: name.trim(),
       category,
@@ -97,11 +102,35 @@ export default function InventoryPage() {
       location: newLoc,
       quantity: Number(qty),
       reorderLevel: Number(reorder),
+      unitPrice: upNum > 0 ? upNum : undefined,
     });
     setName('');
     setQty('');
     setReorder('');
+    setUnitPriceInput('');
     setShowAdd(false);
+  };
+
+  // Total inventory value (qty * unitPrice). Items without unitPrice are skipped.
+  const totalInventoryValue = useMemo(
+    () =>
+      inventory.reduce(
+        (sum, i) => sum + (i.unitPrice ? i.quantity * i.unitPrice : 0),
+        0
+      ),
+    [inventory]
+  );
+
+  const pricedItemsCount = useMemo(
+    () => inventory.filter((i) => i.unitPrice && i.unitPrice > 0).length,
+    [inventory]
+  );
+
+  // Format INR in lakh/crore where helpful.
+  const formatLakhCrore = (n: number): string => {
+    if (n >= 10000000) return `₹${(n / 10000000).toFixed(2)} Cr`;
+    if (n >= 100000) return `₹${(n / 100000).toFixed(2)} L`;
+    return formatINR(n);
   };
 
   if (!mounted) return null;
@@ -194,12 +223,41 @@ export default function InventoryPage() {
                 onChange={(e) => setReorder(e.target.value)}
               />
             </div>
+            <div>
+              <label className="label">Unit price (INR, optional)</label>
+              <input
+                className="input"
+                type="number"
+                step="0.01"
+                min="0"
+                value={unitPriceInput}
+                onChange={(e) => setUnitPriceInput(e.target.value)}
+                placeholder="e.g. 120"
+              />
+            </div>
             <div className="sm:col-span-3">
               <button type="submit" className="btn btn-primary">Save item</button>
             </div>
           </form>
         </section>
       ) : null}
+
+      <section className="card flex flex-wrap items-center justify-between gap-3 p-5">
+        <div>
+          <div className="text-xs uppercase tracking-wide text-slate-500">
+            Total inventory value
+          </div>
+          <div className="mt-0.5 text-2xl font-semibold text-slate-900">
+            {totalInventoryValue > 0 ? formatLakhCrore(totalInventoryValue) : '—'}
+          </div>
+          <div className="text-xs text-slate-500">
+            {pricedItemsCount} of {inventory.length} items priced
+            {inventory.length > 0 && pricedItemsCount < inventory.length
+              ? ' (add unit prices on remaining items to refine)'
+              : ''}
+          </div>
+        </div>
+      </section>
 
       <section className="card p-5">
         <div className="flex flex-wrap items-center gap-3">
@@ -239,7 +297,9 @@ export default function InventoryPage() {
                 <th className="table-th">Category</th>
                 <th className="table-th">Location</th>
                 <th className="table-th text-right">Quantity</th>
+                <th className="table-th text-right">Unit price</th>
                 <th className="table-th text-right">Reorder level</th>
+                <th className="table-th text-right">History</th>
                 {canEdit ? <th className="table-th text-right">Adjust</th> : null}
               </tr>
             </thead>
@@ -259,7 +319,20 @@ export default function InventoryPage() {
                     >
                       {i.quantity} {i.unit}
                     </td>
+                    <td className="table-td text-right tabular-nums">
+                      {i.unitPrice ? formatINR(i.unitPrice) : <span className="text-slate-400">—</span>}
+                    </td>
                     <td className="table-td text-right tabular-nums">{i.reorderLevel}</td>
+                    <td className="table-td text-right">
+                      <button
+                        type="button"
+                        className="btn btn-secondary px-2 py-1 text-xs"
+                        onClick={() => setHistoryFor(i.id)}
+                        title="Stock history"
+                      >
+                        <History className="h-3 w-3" />
+                      </button>
+                    </td>
                     {canEdit ? (
                       <td className="table-td text-right">
                         <div className="inline-flex gap-1">
@@ -292,6 +365,15 @@ export default function InventoryPage() {
           ) : null}
         </div>
       </section>
+
+      {historyFor ? (
+        <StockHistoryModal
+          itemId={historyFor}
+          onClose={() => setHistoryFor(null)}
+          itemName={inventory.find((i) => i.id === historyFor)?.name ?? ''}
+          history={getStockHistory(historyFor)}
+        />
+      ) : null}
 
       {invoiceOpen ? (
         <InvoiceUploadModal
@@ -771,3 +853,96 @@ function InvoiceUploadModal({
     </div>
   );
 }
+
+// -------------------- Stock history modal --------------------
+
+function StockHistoryModal({
+  itemId,
+  itemName,
+  history,
+  onClose,
+}: {
+  itemId: string;
+  itemName: string;
+  history: import('@/lib/types').StockAdjustment[];
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 pt-12 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-2xl rounded-xl bg-white shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
+          <div>
+            <div className="text-lg font-semibold text-slate-900">
+              Stock history
+            </div>
+            <div className="text-xs text-slate-500">{itemName || itemId}</div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full p-1 text-slate-500 hover:bg-slate-100"
+            aria-label="Close"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="p-5">
+          {history.length === 0 ? (
+            <div className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500">
+              No adjustments yet. Stock changes from invoices, GRNs and manual
+              edits will show up here.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+                    <th className="py-1 pr-2">Date</th>
+                    <th className="py-1 pr-2 text-right">Delta</th>
+                    <th className="py-1 pr-2">Reason</th>
+                    <th className="py-1 pr-2 text-right">New qty</th>
+                    <th className="py-1">Source</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {history.map((h) => (
+                    <tr key={h.id}>
+                      <td className="py-1 pr-2 text-xs text-slate-600">
+                        {formatDateTime(h.adjustedAt)}
+                      </td>
+                      <td
+                        className={
+                          'py-1 pr-2 text-right tabular-nums font-semibold ' +
+                          (h.delta >= 0 ? 'text-emerald-700' : 'text-rose-700')
+                        }
+                      >
+                        {h.delta >= 0 ? '+' : ''}
+                        {h.delta}
+                      </td>
+                      <td className="py-1 pr-2 text-slate-700">{h.reason}</td>
+                      <td className="py-1 pr-2 text-right tabular-nums">
+                        {h.resultingQuantity}
+                      </td>
+                      <td className="py-1 text-xs">
+                        <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-slate-600">
+                          {h.source ?? 'manual'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
