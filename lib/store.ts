@@ -23,6 +23,8 @@ import type {
   StockAdjustment,
   VendorReliabilityEntry,
   QuoteAnalysisResult,
+  ReorderPredictionResult,
+  ReorderPredictionBundle,
 } from './types';
 import {
   seedInventory,
@@ -71,10 +73,15 @@ interface AppState {
   priceHistory: PriceHistoryEntry[];
   stockAdjustments: StockAdjustment[];
   vendorReliability: VendorReliabilityEntry[];
+  lastReorderPrediction?: {
+    generatedAt: string;
+    result: ReorderPredictionResult;
+  };
 
   setRole: (r: Role | null) => void;
 
   addInventoryItem: (item: Omit<InventoryItem, 'id'>) => void;
+  deleteInventoryItem: (id: string) => void;
   adjustStock: (
     id: string,
     delta: number,
@@ -137,6 +144,9 @@ interface AppState {
     extracted: ExtractedInvoiceData,
     opts: ProcessInvoiceOptions
   ) => ProcessInvoiceResult;
+
+  getReorderInputBundle: () => ReorderPredictionBundle;
+  setReorderPrediction: (result: ReorderPredictionResult) => void;
 }
 
 export const useStore = create<AppState>()(
@@ -156,12 +166,18 @@ export const useStore = create<AppState>()(
       priceHistory: [],
       stockAdjustments: [],
       vendorReliability: [],
+      lastReorderPrediction: undefined,
 
       setRole: (role) => set({ role }),
 
       addInventoryItem: (item) =>
         set((s) => ({
           inventory: [...s.inventory, { ...item, id: id('inv') }],
+        })),
+
+      deleteInventoryItem: (itemId) =>
+        set((s) => ({
+          inventory: s.inventory.filter((it) => it.id !== itemId),
         })),
 
       adjustStock: (itemId, delta, reason, source, sourceId, adjustedBy) => {
@@ -735,10 +751,77 @@ export const useStore = create<AppState>()(
           createdVendor,
         };
       },
+
+      getReorderInputBundle: () => {
+        const state = get();
+        // Only items at or near reorder level (≤ 1.5× reorderLevel) are
+        // candidates for the AI. This keeps the payload focused and small.
+        const candidates = state.inventory.filter((it) => {
+          const threshold = it.reorderLevel * 1.5;
+          return it.quantity <= threshold;
+        });
+        const candidateIds = new Set(candidates.map((c) => c.id));
+        const candidateNamesLower = new Set(
+          candidates.map((c) => c.name.toLowerCase())
+        );
+
+        return {
+          items: candidates.map((it) => ({
+            id: it.id,
+            name: it.name,
+            unit: it.unit,
+            category: it.category,
+            currentQuantity: it.quantity,
+            reorderLevel: it.reorderLevel,
+            unitPrice: it.unitPrice,
+            location: it.location,
+          })),
+          stockHistory: state.stockAdjustments
+            .filter((a) => candidateIds.has(a.itemId))
+            .map((a) => ({
+              itemId: a.itemId,
+              delta: a.delta,
+              adjustedAt: a.adjustedAt,
+              source: a.source,
+            })),
+          vendorLedger: state.vendorLedger
+            .filter(
+              (v) =>
+                v.itemName &&
+                candidateNamesLower.has(v.itemName.toLowerCase()) &&
+                typeof v.unitPrice === 'number' &&
+                typeof v.quantity === 'number'
+            )
+            .map((v) => ({
+              itemName: v.itemName as string,
+              quantity: (v.quantity as number) ?? 0,
+              unit: v.unit ?? '',
+              unitPrice: (v.unitPrice as number) ?? 0,
+              date: v.invoiceDate,
+            })),
+          priceHistory: state.priceHistory
+            .filter((p) =>
+              candidateNamesLower.has(p.itemName.toLowerCase())
+            )
+            .map((p) => ({
+              itemName: p.itemName,
+              unitPrice: p.unitPrice,
+              date: p.date,
+            })),
+        };
+      },
+
+      setReorderPrediction: (result) =>
+        set({
+          lastReorderPrediction: {
+            generatedAt: new Date().toISOString(),
+            result,
+          },
+        }),
     }),
     {
       name: 'restaurant-os-store',
-      version: 5,
+      version: 6,
       migrate: (persisted, version) => {
         const state =
           persisted && typeof persisted === 'object'
@@ -770,6 +853,12 @@ export const useStore = create<AppState>()(
           }
           // No unitPrice backfill needed — it's optional and `undefined`
           // is the correct default for items without a known cost.
+        }
+        // v6: NON-destructive — add lastReorderPrediction slot.
+        if (version < 6) {
+          if (!('lastReorderPrediction' in state)) {
+            state.lastReorderPrediction = undefined;
+          }
         }
         return state as unknown as AppState;
       },

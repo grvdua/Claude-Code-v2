@@ -313,3 +313,61 @@ export type VoiceFormType =
   | 'inventory-adjust'
   | 'attendance'
   | 'document-meta';
+
+export type ReorderUrgency = 'critical' | 'high' | 'medium' | 'low';
+
+export type ReorderPriceTrend = 'rising' | 'stable' | 'falling';
+
+export interface ReorderPredictionItem {
+  itemId: string;
+  recommendedQuantity: number;
+  urgency: ReorderUrgency;
+  estimatedDaysUntilStockout: number;
+  projectedSpendINR: number;
+  reasoning: string;
+  priceTrend: ReorderPriceTrend;
+}
+
+export interface ReorderPredictionResult {
+  items: ReorderPredictionItem[];
+  summary: string;
+}
+
+export interface ReorderPredictionBundleItem {
+  id: string;
+  name: string;
+  unit: string;
+  category: string;
+  currentQuantity: number;
+  reorderLevel: number;
+  unitPrice?: number;
+  location: Location;
+}
+
+export interface ReorderStockHistoryEntry {
+  itemId: string;
+  delta: number;
+  adjustedAt: string;
+  source?: StockAdjustment['source'];
+}
+
+export interface ReorderVendorLedgerEntry {
+  itemName: string;
+  quantity: number;
+  unit: string;
+  unitPrice: number;
+  date: string;
+}
+
+export interface ReorderPriceHistoryEntry {
+  itemName: string;
+  unitPrice: number;
+  date: string;
+}
+
+export interface ReorderPredictionBundle {
+  items: ReorderPredictionBundleItem[];
+  stockHistory: ReorderStockHistoryEntry[];
+  vendorLedger: ReorderVendorLedgerEntry[];
+  priceHistory: ReorderPriceHistoryEntry[];
+}

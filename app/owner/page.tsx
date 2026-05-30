@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import Link from 'next/link';
 import {
   CheckCircle2,
   XCircle,
@@ -12,6 +13,7 @@ import {
   Activity,
   TrendingUp,
   Truck,
+  Brain,
 } from 'lucide-react';
 import { KpiCard } from '@/components/KpiCard';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -37,8 +39,16 @@ export default function OwnerPage() {
   const vendors = useStore((s) => s.vendors);
   const vendorLedger = useStore((s) => s.vendorLedger);
   const priceHistory = useStore((s) => s.priceHistory);
+  const lastReorderPrediction = useStore((s) => s.lastReorderPrediction);
   const approvePO = useStore((s) => s.approvePO);
   const rejectPO = useStore((s) => s.rejectPO);
+
+  const reorderAlertsCount = useMemo(() => {
+    if (!lastReorderPrediction) return 0;
+    return lastReorderPrediction.result.items.filter(
+      (it) => it.urgency === 'critical' || it.urgency === 'high'
+    ).length;
+  }, [lastReorderPrediction]);
 
   const pendingPOs = useMemo(
     () => pos.filter((p) => p.status === 'pending-approval' && p.totalValue >= PO_APPROVAL_THRESHOLD),
@@ -167,6 +177,23 @@ export default function OwnerPage() {
           tone={priceAlerts ? 'warn' : 'success'}
           hint="Items >10% above 3-mo avg"
         />
+        <Link
+          href="/inventory#reorder-suggestions"
+          className="rounded-xl outline-none ring-offset-2 focus-visible:ring-2 focus-visible:ring-brand-500"
+          aria-label="View AI reorder suggestions"
+        >
+          <KpiCard
+            label="Reorder alerts"
+            value={reorderAlertsCount}
+            icon={Brain}
+            tone={reorderAlertsCount ? 'danger' : 'default'}
+            hint={
+              lastReorderPrediction
+                ? 'Critical + high urgency items'
+                : 'Run AI analysis from Inventory'
+            }
+          />
+        </Link>
       </section>
 
       <section className="card p-5">
